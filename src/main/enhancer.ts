@@ -7,7 +7,8 @@ export const MAX_ENHANCE_PIXELS = 100_000_000;
 let session: ort.InferenceSession | null = null;
 
 function modelPath(): string {
-  return path.join(app.getAppPath(), 'models', 'zero-dce.onnx');
+  const base = app.isPackaged ? process.resourcesPath : app.getAppPath();
+  return path.join(base, 'models', 'zero-dce.onnx');
 }
 
 async function getSession(): Promise<ort.InferenceSession> {
