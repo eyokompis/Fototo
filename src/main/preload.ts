@@ -35,6 +35,9 @@ contextBridge.exposeInMainWorld('fototo', {
   importFolder: (): Promise<number> => ipcRenderer.invoke('library:import-folder'),
   saveImage: (data: ArrayBuffer, defaultName: string): Promise<boolean> =>
     ipcRenderer.invoke('save-image', data, defaultName),
+  chooseDirectory: (): Promise<string | null> => ipcRenderer.invoke('choose-directory'),
+  saveImageTo: (data: ArrayBuffer, dirPath: string, fileName: string): Promise<string> =>
+    ipcRenderer.invoke('save-image-to', data, dirPath, fileName),
   modelStatus: (): Promise<{ label: string; downloaded: boolean }> =>
     ipcRenderer.invoke('ai:model-status'),
   upscaleImage: (

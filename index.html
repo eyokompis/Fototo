@@ -69,9 +69,16 @@
       <div class="gallery-head">
         <h2>Gallery</h2>
         <div>
+          <button id="gallery-select-btn" type="button">Select</button>
           <button id="import-folder-btn" type="button">Add folder</button>
           <button id="gallery-close" type="button">Close</button>
         </div>
+      </div>
+      <div id="batch-bar" hidden>
+        <span id="batch-count"></span>
+        <button id="batch-upscale" type="button" disabled>Upscale 4×</button>
+        <button id="batch-enhance" type="button" disabled>Enhance light</button>
+        <button id="batch-done" type="button">Done</button>
       </div>
       <div id="gallery-grid"></div>
       <p id="gallery-empty" hidden>No photos yet. Open a photo or add a folder.</p>
@@ -97,6 +104,8 @@
       <p><strong>⟲ / ⟳</strong> rotate the photo by 90°. <strong>Crop</strong> lets you drag a rectangle on the photo — click <strong>Apply crop</strong> to keep only that part, or <strong>Cancel</strong> to discard. The original file is never modified; use <strong>Save</strong> to export the result.</p>
       <h3>Gallery</h3>
       <p>Click <strong>Gallery</strong> to browse every photo in your library. <strong>Add folder</strong> imports all images from a folder at once (thumbnails appear once a photo has been opened).</p>
+      <h3>Batch processing</h3>
+      <p>In the Gallery, click <strong>Select</strong> and choose the photos you want, then pick <strong>Upscale 4×</strong> or <strong>Enhance light</strong>. Choose an output folder and each processed copy is saved there as <code>name-fototo.png</code> — originals are never modified.</p>
       <h3>Save</h3>
       <p>Exports the edited photo as a new PNG file (<code>name-fototo.png</code>); the original stays untouched.</p>
       <h3>Privacy</h3>

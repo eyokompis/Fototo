@@ -46,6 +46,8 @@ export interface FototoApi {
   libraryPhotos(limit: number): Promise<LibraryEntry[]>;
   importFolder(): Promise<number>;
   saveImage(data: ArrayBuffer, defaultName: string): Promise<boolean>;
+  chooseDirectory(): Promise<string | null>;
+  saveImageTo(data: ArrayBuffer, dirPath: string, fileName: string): Promise<string>;
   modelStatus(): Promise<ModelStatus>;
   upscaleImage(image: RawImage): Promise<RawImage>;
   enhanceImage(image: RawImage): Promise<RawImage>;

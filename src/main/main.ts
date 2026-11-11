@@ -119,6 +119,31 @@ ipcMain.handle('ai:enhance', async (_event, image: { data: ArrayBuffer; width: n
   return { data: result.data.buffer, width: result.width, height: result.height };
 });
 
+ipcMain.handle('choose-directory', async () => {
+  const result = await dialog.showOpenDialog({
+    title: 'Choose output folder',
+    properties: ['openDirectory', 'createDirectory'],
+  });
+  if (result.canceled || result.filePaths.length === 0) return null;
+  return result.filePaths[0];
+});
+
+ipcMain.handle('save-image-to', async (_event, data: ArrayBuffer, dirPath: string, fileName: string) => {
+  const ext = path.extname(fileName);
+  const base = path.basename(fileName, ext);
+  let name = fileName;
+  for (let i = 1; i < 1000; i++) {
+    try {
+      await fs.access(path.join(dirPath, name));
+      name = `${base} (${i})${ext}`;
+    } catch {
+      break;
+    }
+  }
+  await fs.writeFile(path.join(dirPath, name), Buffer.from(data));
+  return name;
+});
+
 ipcMain.handle('save-image', async (_event, data: ArrayBuffer, defaultName: string) => {
   const result = await dialog.showSaveDialog({
     title: 'Save photo',

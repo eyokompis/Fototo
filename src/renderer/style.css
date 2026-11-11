@@ -339,6 +339,30 @@ dialog h2 {
   text-align: center;
 }
 
+.gallery-item.selected {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px var(--accent);
+}
+
+#batch-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 0 4px;
+  border-top: 1px solid var(--border);
+  margin-top: 10px;
+}
+
+#batch-bar[hidden] {
+  display: none;
+}
+
+#batch-count {
+  flex: 1;
+  font-size: 13px;
+  color: var(--card-text);
+}
+
 dialog h3 {
   font-size: 13px;
   margin: 16px 0 4px;
