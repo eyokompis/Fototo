@@ -165,6 +165,22 @@ main {
   pointer-events: none;
 }
 
+#compare-canvas {
+  position: absolute;
+  z-index: 3;
+  cursor: ew-resize;
+}
+
+#compare-divider {
+  position: absolute;
+  z-index: 4;
+  width: 2px;
+  margin-left: -1px;
+  background: #ffffff;
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.6);
+  cursor: ew-resize;
+}
+
 .transform-row {
   display: flex;
   gap: 8px;

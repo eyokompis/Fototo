@@ -52,7 +52,12 @@
         <button id="rotate-ccw" type="button" title="Rotate 90° counter-clockwise">⟲</button>
         <button id="rotate-cw" type="button" title="Rotate 90° clockwise">⟳</button>
         <button id="crop-btn" type="button">Crop</button>
+        <button id="compare-btn" type="button" title="Drag the divider to compare original and edited">Compare</button>
       </div>
+      <label>
+        Straighten
+        <input id="straighten" type="range" min="-10" max="10" step="0.5" value="0" />
+      </label>
       <div class="section-label">Upscale (AI)</div>
       <div class="transform-row">
         <button id="up2-btn" type="button" title="Upscale 2× with Real-ESRGAN">2×</button>
@@ -134,15 +139,15 @@
       <h3>Enhance light (AI)</h3>
       <p>Brightens dark or underexposed photos with Zero-DCE. This model is included in the app.</p>
       <h3>Zoom &amp; compare</h3>
-      <p>Use <strong>− / Fit / +</strong> in the sidebar, or hold <strong>Ctrl</strong> and scroll, to zoom. Click and hold the photo to peek at the original, unedited version — release to see your edits.</p>
-      <h3>Rotate &amp; crop</h3>
-      <p><strong>⟲ / ⟳</strong> rotate the photo by 90°. <strong>Crop</strong> lets you drag a rectangle on the photo — click <strong>Apply crop</strong> to keep only that part, or <strong>Cancel</strong> to discard. The original file is never modified; use <strong>Save</strong> to export the result.</p>
+      <p>Use <strong>− / Fit / +</strong> in the sidebar, or hold <strong>Ctrl</strong> and scroll, to zoom. Click and hold the photo to peek at the original, unedited version — release to see your edits. The <strong>Compare</strong> button shows the original on the left and your edit on the right; drag the divider to move the split.</p>
+      <h3>Rotate, straighten &amp; crop</h3>
+      <p><strong>⟲ / ⟳</strong> rotate the photo by 90°. The <strong>Straighten</strong> slider rotates by up to 10° in both directions and trims the corners so the photo stays rectangular. <strong>Crop</strong> lets you drag a rectangle on the photo — click <strong>Apply crop</strong> to keep only that part, or <strong>Cancel</strong> to discard. The original file is never modified; use <strong>Save</strong> to export the result.</p>
       <h3>Gallery</h3>
       <p>Click <strong>Gallery</strong> to browse every photo in your library. <strong>Add folder</strong> imports all images from a folder at once (thumbnails appear once a photo has been opened).</p>
       <h3>Batch processing</h3>
       <p>In the Gallery, click <strong>Select</strong> and choose the photos you want, then pick <strong>Upscale 4×</strong> or <strong>Enhance light</strong>. Choose an output folder and each processed copy is saved there as <code>name-fototo.png</code> — originals are never modified.</p>
       <h3>Save</h3>
-      <p>Exports the edited photo as a new file (<code>name-fototo.png</code> or <code>.jpg</code> — pick the format and JPEG quality in the sidebar); the original stays untouched.</p>
+      <p>Exports the edited photo as a new file (<code>name-fototo.png</code> or <code>.jpg</code> — pick the format and JPEG quality in the sidebar); the original stays untouched. JPEG exports keep the original photo's EXIF metadata (camera, date, GPS).</p>
       <h3>Undo &amp; redo</h3>
       <p><strong>Undo</strong> / <strong>Redo</strong> (or Ctrl+Z / Ctrl+Y) step back and forward through AI, crop, rotate and auto-enhance actions. Slider changes are always live and revert with <strong>Reset</strong>.</p>
       <h3>Auto-enhance</h3>

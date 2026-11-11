@@ -1,4 +1,5 @@
 import { DEFAULT_ADJUSTMENTS, ImageProcessor, type Adjustments } from './processor';
+import { withExif } from './exif';
 import type { LoadedImage, RawImage } from './api';
 import './api';
 import './style.css';
@@ -51,6 +52,8 @@ const transformRow = document.getElementById('transform-row') as HTMLDivElement;
 const cropActions = document.getElementById('crop-actions') as HTMLDivElement;
 const cropOverlay = document.getElementById('crop-overlay') as HTMLDivElement;
 const cropSelection = document.getElementById('crop-selection') as HTMLDivElement;
+const straightenInput = document.getElementById('straighten') as HTMLInputElement;
+const compareBtn = document.getElementById('compare-btn') as HTMLButtonElement;
 const mainEl = document.querySelector('main') as HTMLElement;
 const themeSelect = document.getElementById('theme-select') as HTMLSelectElement;
 const helpBtn = document.getElementById('help-btn') as HTMLButtonElement;
@@ -73,8 +76,12 @@ let busy = false;
 let saveTimer: ReturnType<typeof setTimeout> | null = null;
 let zoom: number | null = null;
 let originalBitmap: ImageBitmap | null = null;
+let sourceBytes: ArrayBuffer | null = null;
 let exportFormat: 'png' | 'jpeg' = 'png';
 let exportQuality = 0.9;
+let comparing = false;
+let compareFraction = 0.5;
+let compareDragging = false;
 
 interface HistoryEntry {
   blob: Blob;
@@ -225,9 +232,13 @@ async function openRecent(imagePath: string): Promise<void> {
 async function applyLoadedImage(result: LoadedImage): Promise<void> {
   exitCrop();
   hideBefore();
+  setComparing(false);
   bitmap = await createImageBitmap(new Blob([result.data]));
   originalBitmap = bitmap;
+  sourceBytes = result.data;
   zoom = null;
+  straightenInput.value = '0';
+  canvas.style.transform = '';
   applyZoom();
   currentName = result.name;
   currentPath = result.path;
@@ -441,6 +452,7 @@ function applyZoom(): void {
     canvas.style.height = `${Math.round(bitmap.height * zoom)}px`;
   }
   if (cropping) positionCropOverlay();
+  if (comparing) positionCompare();
 }
 
 const beforeCanvas = document.createElement('canvas');
@@ -449,7 +461,7 @@ beforeCanvas.hidden = true;
 mainEl.appendChild(beforeCanvas);
 
 function showBefore(): void {
-  if (!originalBitmap || !bitmap || cropping || busy) return;
+  if (!originalBitmap || !bitmap || cropping || busy || comparing) return;
   const rect = canvas.getBoundingClientRect();
   const base = mainEl.getBoundingClientRect();
   beforeCanvas.width = originalBitmap.width;
@@ -466,6 +478,53 @@ function showBefore(): void {
 
 function hideBefore(): void {
   beforeCanvas.hidden = true;
+}
+
+const compareCanvas = document.createElement('canvas');
+compareCanvas.id = 'compare-canvas';
+compareCanvas.hidden = true;
+const compareDivider = document.createElement('div');
+compareDivider.id = 'compare-divider';
+compareDivider.hidden = true;
+mainEl.append(compareCanvas, compareDivider);
+
+function positionCompare(): void {
+  if (!originalBitmap) return;
+  const rect = canvas.getBoundingClientRect();
+  const base = mainEl.getBoundingClientRect();
+  compareCanvas.width = originalBitmap.width;
+  compareCanvas.height = originalBitmap.height;
+  const ctx = compareCanvas.getContext('2d');
+  if (!ctx) return;
+  ctx.drawImage(originalBitmap, 0, 0);
+  compareCanvas.style.left = `${rect.left - base.left}px`;
+  compareCanvas.style.top = `${rect.top - base.top}px`;
+  compareCanvas.style.width = `${rect.width}px`;
+  compareCanvas.style.height = `${rect.height}px`;
+  updateCompareDivider(rect, base);
+}
+
+function updateCompareDivider(rect?: DOMRect, base?: DOMRect): void {
+  rect ??= canvas.getBoundingClientRect();
+  base ??= mainEl.getBoundingClientRect();
+  compareCanvas.style.clipPath = `inset(0 ${100 - compareFraction * 100}% 0 0)`;
+  compareDivider.style.left = `${rect.left - base.left + rect.width * compareFraction}px`;
+  compareDivider.style.top = `${rect.top - base.top}px`;
+  compareDivider.style.height = `${rect.height}px`;
+}
+
+function setComparing(on: boolean): void {
+  if (on && (!originalBitmap || !bitmap || busy || cropping)) return;
+  comparing = on;
+  compareCanvas.hidden = !on;
+  compareDivider.hidden = !on;
+  if (on) positionCompare();
+}
+
+function updateCompareFromEvent(e: MouseEvent): void {
+  const rect = canvas.getBoundingClientRect();
+  compareFraction = Math.min(1, Math.max(0, (e.clientX - rect.left) / rect.width));
+  updateCompareDivider();
 }
 
 function positionCropOverlay(): void {
@@ -558,6 +617,43 @@ async function rotateBy(deg: number): Promise<void> {
     applyAdjustments();
     recordThumbnail();
     setStatus(`Rotated to ${bitmap.width}×${bitmap.height}`);
+    await commitHistory();
+  } finally {
+    busy = false;
+  }
+}
+
+async function applyStraighten(): Promise<void> {
+  const angle = Number(straightenInput.value);
+  straightenInput.value = '0';
+  canvas.style.transform = '';
+  if (!bitmap || !processor || busy || angle === 0) return;
+  busy = true;
+  try {
+    const rad = (angle * Math.PI) / 180;
+    const cos = Math.abs(Math.cos(rad));
+    const sin = Math.abs(Math.sin(rad));
+    const ratio = bitmap.width / bitmap.height;
+    const rw = bitmap.width * cos + bitmap.height * sin;
+    const rh = bitmap.width * sin + bitmap.height * cos;
+    const w = Math.min(rw / (cos + sin / ratio), rh / (sin + cos / ratio));
+    const h = w / ratio;
+    const offscreen = new OffscreenCanvas(Math.round(rw), Math.round(rh));
+    const ctx = offscreen.getContext('2d');
+    if (!ctx) return;
+    ctx.translate(offscreen.width / 2, offscreen.height / 2);
+    ctx.rotate(rad);
+    ctx.drawImage(bitmap, -bitmap.width / 2, -bitmap.height / 2);
+    const sx = Math.max(0, Math.round((offscreen.width - w) / 2));
+    const sy = Math.max(0, Math.round((offscreen.height - h) / 2));
+    const sw = Math.min(Math.round(w), offscreen.width - sx);
+    const sh = Math.min(Math.round(h), offscreen.height - sy);
+    bitmap = await createImageBitmap(offscreen, sx, sy, sw, sh);
+    processor.setImage(bitmap);
+    applyZoom();
+    applyAdjustments();
+    recordThumbnail();
+    setStatus(`Straightened ${angle > 0 ? '+' : ''}${angle}°`);
     await commitHistory();
   } finally {
     busy = false;
@@ -708,7 +804,8 @@ async function saveImage(): Promise<void> {
   const type = exportFormat === 'jpeg' ? 'image/jpeg' : 'image/png';
   const blob = await processor.exportBlob(type, exportQuality);
   if (!blob) return;
-  const data = await blob.arrayBuffer();
+  let data = await blob.arrayBuffer();
+  if (exportFormat === 'jpeg' && sourceBytes) data = withExif(sourceBytes, data);
   const dot = currentName.lastIndexOf('.');
   const base = dot > 0 ? currentName.slice(0, dot) : currentName;
   const ext = exportFormat === 'jpeg' ? 'jpg' : 'png';
@@ -780,6 +877,11 @@ window.addEventListener('mouseup', hideBefore);
 
 rotateCcwBtn.addEventListener('click', () => void rotateBy(-90));
 rotateCwBtn.addEventListener('click', () => void rotateBy(90));
+straightenInput.addEventListener('input', () => {
+  const angle = Number(straightenInput.value);
+  canvas.style.transform = angle === 0 ? '' : `rotate(${angle}deg)`;
+});
+straightenInput.addEventListener('change', () => void applyStraighten());
 cropBtn.addEventListener('click', enterCrop);
 cropCancelBtn.addEventListener('click', exitCrop);
 cropApplyBtn.addEventListener('click', () => void applyCrop());
@@ -799,6 +901,25 @@ window.addEventListener('mouseup', () => {
 });
 window.addEventListener('resize', () => {
   if (cropping) positionCropOverlay();
+  if (comparing) positionCompare();
+});
+
+compareBtn.addEventListener('click', () => setComparing(!comparing));
+compareCanvas.addEventListener('mousedown', (e) => {
+  e.preventDefault();
+  compareDragging = true;
+  updateCompareFromEvent(e);
+});
+compareDivider.addEventListener('mousedown', (e) => {
+  e.preventDefault();
+  compareDragging = true;
+  updateCompareFromEvent(e);
+});
+window.addEventListener('mousemove', (e) => {
+  if (comparing && compareDragging) updateCompareFromEvent(e);
+});
+window.addEventListener('mouseup', () => {
+  compareDragging = false;
 });
 
 helpBtn.addEventListener('click', () => helpDialog.showModal());
