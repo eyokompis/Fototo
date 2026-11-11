@@ -1,6 +1,49 @@
 :root {
   color-scheme: dark;
+  --bg: #111318;
+  --text: #e8eaf0;
+  --muted: #8b93a7;
+  --border: #262a33;
+  --surface: #2b3040;
+  --surface-hover: #363d52;
+  --surface-border: #3a4054;
+  --card: #1a1d25;
+  --card-text: #c3c9d9;
+  --accent: #6c8cff;
+  --backdrop: rgba(0, 0, 0, 0.55);
   font-family: system-ui, -apple-system, 'Segoe UI', sans-serif;
+}
+
+:root[data-theme='light'] {
+  color-scheme: light;
+  --bg: #f5f6fa;
+  --text: #1c2130;
+  --muted: #5d6579;
+  --border: #d8dce6;
+  --surface: #ffffff;
+  --surface-hover: #eef0f6;
+  --surface-border: #c9cfdd;
+  --card: #ffffff;
+  --card-text: #3a4152;
+  --accent: #3b5bdb;
+  --backdrop: rgba(28, 33, 48, 0.4);
+}
+
+@media (prefers-color-scheme: light) {
+  :root:not([data-theme='dark']) {
+    color-scheme: light;
+    --bg: #f5f6fa;
+    --text: #1c2130;
+    --muted: #5d6579;
+    --border: #d8dce6;
+    --surface: #ffffff;
+    --surface-hover: #eef0f6;
+    --surface-border: #c9cfdd;
+    --card: #ffffff;
+    --card-text: #3a4152;
+    --accent: #3b5bdb;
+    --backdrop: rgba(28, 33, 48, 0.4);
+  }
 }
 
 * {
@@ -16,8 +59,8 @@ body {
   grid-template-areas:
     'header header'
     'main controls';
-  background: #111318;
-  color: #e8eaf0;
+  background: var(--bg);
+  color: var(--text);
 }
 
 header {
@@ -26,7 +69,7 @@ header {
   align-items: center;
   gap: 12px;
   padding: 10px 16px;
-  border-bottom: 1px solid #262a33;
+  border-bottom: 1px solid var(--border);
 }
 
 h1 {
@@ -35,7 +78,7 @@ h1 {
 }
 
 #file-name {
-  color: #8b93a7;
+  color: var(--muted);
   font-size: 13px;
   flex: 1;
   overflow: hidden;
@@ -44,9 +87,9 @@ h1 {
 }
 
 button {
-  background: #2b3040;
-  color: #e8eaf0;
-  border: 1px solid #3a4054;
+  background: var(--surface);
+  color: var(--text);
+  border: 1px solid var(--surface-border);
   border-radius: 6px;
   padding: 6px 14px;
   font-size: 13px;
@@ -54,7 +97,7 @@ button {
 }
 
 button:hover:not(:disabled) {
-  background: #363d52;
+  background: var(--surface-hover);
 }
 
 button:disabled {
@@ -62,9 +105,19 @@ button:disabled {
   cursor: default;
 }
 
+select {
+  background: var(--surface);
+  color: var(--text);
+  border: 1px solid var(--surface-border);
+  border-radius: 6px;
+  padding: 6px 8px;
+  font-size: 13px;
+  cursor: pointer;
+}
+
 #status {
   font-size: 12px;
-  color: #8b93a7;
+  color: var(--muted);
   white-space: nowrap;
 }
 
@@ -83,7 +136,7 @@ main {
 }
 
 #empty-state {
-  color: #8b93a7;
+  color: var(--muted);
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -111,15 +164,15 @@ main {
   flex-direction: column;
   gap: 4px;
   padding: 6px;
-  background: #1a1d25;
-  border: 1px solid #262a33;
+  background: var(--card);
+  border: 1px solid var(--border);
   border-radius: 8px;
   width: 120px;
   cursor: pointer;
 }
 
 .recent-item:hover {
-  border-color: #6c8cff;
+  border-color: var(--accent);
 }
 
 .recent-item img {
@@ -131,7 +184,7 @@ main {
 
 .recent-item span {
   font-size: 11px;
-  color: #c3c9d9;
+  color: var(--card-text);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -147,7 +200,7 @@ main {
   grid-area: controls;
   width: 260px;
   padding: 16px;
-  border-left: 1px solid #262a33;
+  border-left: 1px solid var(--border);
   display: flex;
   flex-direction: column;
   gap: 18px;
@@ -158,10 +211,63 @@ label {
   flex-direction: column;
   gap: 6px;
   font-size: 13px;
-  color: #c3c9d9;
+  color: var(--card-text);
 }
 
 input[type='range'] {
   width: 100%;
-  accent-color: #6c8cff;
+  accent-color: var(--accent);
+}
+
+dialog {
+  background: var(--bg);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 20px 24px;
+  width: min(560px, calc(100vw - 80px));
+  max-height: 80vh;
+  overflow: auto;
+}
+
+dialog::backdrop {
+  background: var(--backdrop);
+}
+
+dialog h2 {
+  font-size: 17px;
+  margin: 0 0 12px;
+}
+
+dialog h3 {
+  font-size: 13px;
+  margin: 16px 0 4px;
+  color: var(--accent);
+}
+
+dialog p,
+dialog li {
+  font-size: 13px;
+  line-height: 1.5;
+  margin: 4px 0;
+  color: var(--card-text);
+}
+
+dialog ul {
+  margin: 4px 0;
+  padding-left: 20px;
+}
+
+dialog code {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 1px 5px;
+  font-size: 12px;
+}
+
+.dialog-actions {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 16px;
 }
