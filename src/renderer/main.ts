@@ -8,6 +8,8 @@ const controls = document.getElementById('controls') as HTMLDivElement;
 const openBtn = document.getElementById('open-btn') as HTMLButtonElement;
 const saveBtn = document.getElementById('save-btn') as HTMLButtonElement;
 const resetBtn = document.getElementById('reset-btn') as HTMLButtonElement;
+const upscaleBtn = document.getElementById('upscale-btn') as HTMLButtonElement;
+const statusEl = document.getElementById('status') as HTMLSpanElement;
 const fileNameEl = document.getElementById('file-name') as HTMLSpanElement;
 
 const sliders: Record<keyof Adjustments, HTMLInputElement> = {
@@ -21,6 +23,11 @@ let processor: ImageProcessor | null = null;
 let bitmap: ImageBitmap | null = null;
 let currentName = 'photo.png';
 let adjustments: Adjustments = { ...DEFAULT_ADJUSTMENTS };
+let busy = false;
+
+function setStatus(text: string): void {
+  statusEl.textContent = text;
+}
 
 function syncSliders(): void {
   sliders.exposure.value = String(adjustments.exposure);
@@ -52,7 +59,47 @@ async function loadImage(): Promise<void> {
   controls.hidden = false;
   saveBtn.disabled = false;
   resetBtn.disabled = false;
+  upscaleBtn.disabled = false;
   resetAdjustments();
+}
+
+async function upscale(): Promise<void> {
+  if (!processor || !bitmap || busy) return;
+  busy = true;
+  upscaleBtn.disabled = true;
+  saveBtn.disabled = true;
+  try {
+    const status = await window.fototo.modelStatus();
+    setStatus(status.downloaded ? 'Upscaling…' : 'Downloading AI model (first run)…');
+
+    const offscreen = new OffscreenCanvas(bitmap.width, bitmap.height);
+    const ctx = offscreen.getContext('2d', { willReadFrequently: true });
+    if (!ctx) throw new Error('Canvas 2D context unavailable');
+    ctx.drawImage(bitmap, 0, 0);
+    const pixels = ctx.getImageData(0, 0, bitmap.width, bitmap.height);
+    const data = pixels.data.buffer as ArrayBuffer;
+
+    const unsubscribe = window.fototo.onProgress(({ stage, done, total }) => {
+      if (stage === 'download') setStatus(`Downloading model ${done}/${total}…`);
+      else setStatus(`Upscaling tile ${done}/${total}…`);
+    });
+    try {
+      const result = await window.fototo.upscaleImage({ data, width: bitmap.width, height: bitmap.height });
+      const upscaled = new ImageData(new Uint8ClampedArray(result.data), result.width, result.height);
+      bitmap = await createImageBitmap(upscaled);
+      processor.setImage(bitmap);
+      resetAdjustments();
+      setStatus(`Upscaled to ${result.width}×${result.height}`);
+    } finally {
+      unsubscribe();
+    }
+  } catch (error) {
+    setStatus(`Upscale failed: ${error instanceof Error ? error.message : String(error)}`);
+  } finally {
+    busy = false;
+    upscaleBtn.disabled = false;
+    saveBtn.disabled = false;
+  }
 }
 
 async function saveImage(): Promise<void> {
@@ -66,6 +113,7 @@ async function saveImage(): Promise<void> {
 }
 
 openBtn.addEventListener('click', loadImage);
+upscaleBtn.addEventListener('click', upscale);
 
 saveBtn.addEventListener('click', saveImage);
 
@@ -77,6 +125,15 @@ for (const key of Object.keys(sliders) as (keyof Adjustments)[]) {
     applyAdjustments();
   });
 }
+
+window.fototo
+  .modelStatus()
+  .then((status) => {
+    upscaleBtn.title = status.downloaded
+      ? `Upscale 4× with ${status.label}`
+      : `Upscale 4× with ${status.label} (model downloads on first use)`;
+  })
+  .catch(() => undefined);
 
 window.addEventListener('dragover', (e) => e.preventDefault());
 window.addEventListener('drop', (e) => {
