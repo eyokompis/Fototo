@@ -37,6 +37,7 @@ export interface RawImage {
 }
 
 export interface FototoApi {
+  pathForFile(file: File): string;
   openImage(): Promise<LoadedImage | null>;
   openImageAt(imagePath: string): Promise<LoadedImage | null>;
   saveEdits(imagePath: string, edits: ImageEdits): Promise<boolean>;
