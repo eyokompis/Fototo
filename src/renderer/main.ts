@@ -266,5 +266,18 @@ loadRecents();
 window.addEventListener('dragover', (e) => e.preventDefault());
 window.addEventListener('drop', (e) => {
   e.preventDefault();
-  loadImage();
+  if (busy) return;
+  const file = e.dataTransfer?.files[0];
+  if (!file) return;
+  const isImage = file.type.startsWith('image/') || /\.(png|jpe?g|webp|gif|bmp|avif)$/i.test(file.name);
+  if (!isImage) {
+    setStatus('Not an image file');
+    return;
+  }
+  const filePath = window.fototo.pathForFile(file);
+  if (!filePath) {
+    setStatus('Could not open dropped photo');
+    return;
+  }
+  openRecent(filePath).catch(() => setStatus('Could not open photo'));
 });
