@@ -13,7 +13,6 @@
         <button id="open-btn" type="button">Open photo</button>
         <button id="save-btn" type="button" disabled>Save</button>
         <button id="reset-btn" type="button" disabled>Reset</button>
-        <button id="upscale-btn" type="button" disabled>Upscale 4× (AI)</button>
         <button id="enhance-btn" type="button" disabled>Enhance light (AI)</button>
         <button id="gallery-btn" type="button">Gallery</button>
         <span id="status"></span>
@@ -49,6 +48,17 @@
         <button id="rotate-ccw" type="button" title="Rotate 90° counter-clockwise">⟲</button>
         <button id="rotate-cw" type="button" title="Rotate 90° clockwise">⟳</button>
         <button id="crop-btn" type="button">Crop</button>
+      </div>
+      <div class="section-label">Upscale (AI)</div>
+      <div class="transform-row">
+        <button id="up2-btn" type="button" title="Upscale 2× with Real-ESRGAN">2×</button>
+        <button id="up4-btn" type="button" title="Upscale 4× with Real-ESRGAN">4×</button>
+      </div>
+      <div class="section-label">Upscale to (AI)</div>
+      <div class="transform-row">
+        <button id="res-2k" type="button" title="Upscale so the long side reaches 2560px">2K</button>
+        <button id="res-4k" type="button" title="Upscale so the long side reaches 3840px">4K</button>
+        <button id="res-8k" type="button" title="Upscale so the long side reaches 7680px (max 4×)">8K</button>
       </div>
       <div id="crop-actions" class="transform-row" hidden>
         <button id="crop-apply" type="button">Apply crop</button>
@@ -102,8 +112,8 @@
         <li><strong>Temperature</strong> — warmer (orange) or cooler (blue) tones</li>
       </ul>
       <p>Edits are saved automatically per photo and restored when you reopen it. <strong>Reset</strong> returns the sliders to neutral. Your original file is never modified.</p>
-      <h3>Upscale 4× (AI)</h3>
-      <p>Increases the resolution 4× with Real-ESRGAN. The AI model (~5 MB) downloads once on first use; an internet connection is only needed for that download.</p>
+      <h3>Upscale (AI)</h3>
+      <p><strong>2×</strong> and <strong>4×</strong> increase the resolution with Real-ESRGAN — 2× runs the 4× model and refines the result back down, which is sharper than a plain resize. <strong>2K / 4K / 8K</strong> upscale the photo so its longer side reaches that resolution (capped at the model's 4×). The AI model (~5 MB) downloads once on first use; an internet connection is only needed for that download.</p>
       <h3>Enhance light (AI)</h3>
       <p>Brightens dark or underexposed photos with Zero-DCE. This model is included in the app.</p>
       <h3>Zoom &amp; compare</h3>
