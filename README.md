@@ -51,6 +51,7 @@ Notes:
 - [x] Low-light enhancement via ONNX Runtime (Zero-DCE, bundled model)
 - [x] Sidecar edit metadata (non-destructive edits)
 - [x] Photo library with SQLite index (recent photos with thumbnails on the start screen)
+- [x] Packaging with electron-builder (NSIS / DMG / AppImage) and custom app icon
 
 ## Non-destructive edits
 
