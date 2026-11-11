@@ -31,6 +31,17 @@ In one terminal run `npm run dev`, and in a second terminal `npx electron .` for
 | `npm run build`       | Build renderer (`dist/`) and main (`dist-electron/`) |
 | `npm run typecheck`   | Typecheck renderer and main process      |
 | `npm start`           | Build everything and launch Electron     |
+| `npm run dist`        | Build and package installers into `release/` |
+| `npm run dist:dir`    | Build and package an unpacked app (fast smoke test) |
+
+## Packaging & installers
+
+Packaging uses [electron-builder](https://www.electron.build) (config in the `build` field of `package.json`). Targets: **NSIS installer** (Windows), **DMG** (macOS), **AppImage** (Linux). Each OS builds its own target — run `npm run dist` on the platform you want.
+
+Notes:
+- The Zero-DCE model ships inside the package (`extraResources`); the Real-ESRGAN model still downloads on first use
+- `onnxruntime-node` is unpacked from the asar and cross-platform/CUDA binaries are pruned per OS to keep installers small
+- Output lands in `release/` (gitignored)
 
 ## Roadmap
 

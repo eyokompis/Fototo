@@ -4,6 +4,7 @@
   "version": "0.1.0",
   "description": "Enhance the quality, light and upscale your photos, locally or with AI.",
   "license": "MIT",
+  "author": "eyokompis",
   "private": true,
   "main": "dist-electron/main.js",
   "scripts": {
@@ -12,16 +13,66 @@
     "build:renderer": "vite build",
     "build:main": "tsc -p tsconfig.node.json",
     "build": "npm run build:renderer && npm run build:main",
-    "start": "npm run build && electron ."
+    "start": "npm run build && electron .",
+    "dist": "npm run build && electron-builder",
+    "dist:dir": "npm run build && electron-builder --dir"
   },
   "devDependencies": {
     "@types/sql.js": "^1.4.11",
     "electron": "^33.0.0",
+    "electron-builder": "^26.18.0",
     "typescript": "^5.6.0",
     "vite": "^6.0.0"
   },
   "dependencies": {
     "onnxruntime-node": "^1.31.1",
     "sql.js": "^1.16.0"
+  },
+  "build": {
+    "appId": "io.github.eyokompis.fototo",
+    "productName": "fototo",
+    "directories": {
+      "output": "release"
+    },
+    "extraResources": [
+      {
+        "from": "models",
+        "to": "models"
+      }
+    ],
+    "asarUnpack": [
+      "**/node_modules/onnxruntime-node/**"
+    ],
+    "files": [
+      "dist/**",
+      "dist-electron/**",
+      "package.json",
+      "!**/node_modules/onnxruntime-node/bin/napi-v6/**/libonnxruntime_providers_cuda.*",
+      "!**/node_modules/onnxruntime-node/bin/napi-v6/**/libonnxruntime_providers_tensorrt.*"
+    ],
+    "win": {
+      "target": "nsis",
+      "files": [
+        "!**/node_modules/onnxruntime-node/bin/napi-v6/linux/**",
+        "!**/node_modules/onnxruntime-node/bin/napi-v6/darwin/**"
+      ]
+    },
+    "mac": {
+      "target": "dmg",
+      "category": "public.app-category.photography",
+      "files": [
+        "!**/node_modules/onnxruntime-node/bin/napi-v6/linux/**",
+        "!**/node_modules/onnxruntime-node/bin/napi-v6/win32/**"
+      ]
+    },
+    "linux": {
+      "target": "AppImage",
+      "category": "Graphics",
+      "files": [
+        "!**/node_modules/onnxruntime-node/bin/napi-v6/linux/arm64/**",
+        "!**/node_modules/onnxruntime-node/bin/napi-v6/darwin/**",
+        "!**/node_modules/onnxruntime-node/bin/napi-v6/win32/**"
+      ]
+    }
   }
 }
