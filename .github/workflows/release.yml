@@ -32,5 +32,7 @@ jobs:
             release/*.dmg
             release/*.AppImage
             release/*.blockmap
-            release/*.yml
+            release/latest.yml
+            release/latest-linux.yml
+            release/latest-mac.yml
           generate_release_notes: true
