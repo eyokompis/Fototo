@@ -1,4 +1,5 @@
 import { app, BrowserWindow, dialog, ipcMain } from 'electron';
+import { autoUpdater } from 'electron-updater';
 import { promises as fs } from 'node:fs';
 import path from 'node:path';
 import { downloadModel, isModelDownloaded, REAL_ESRGAN_X4, upscaleImage } from './upscaler';
@@ -28,6 +29,18 @@ function createWindow(): void {
     win.loadURL('http://localhost:5173');
   } else {
     win.loadFile(path.join(__dirname, '..', 'dist', 'index.html'));
+  }
+
+  if (app.isPackaged && process.platform !== 'darwin') {
+    autoUpdater.autoDownload = true;
+    autoUpdater.autoInstallOnAppQuit = true;
+    const send = (message: string) => {
+      if (!win.isDestroyed()) win.webContents.send('update:status', message);
+    };
+    autoUpdater.on('update-available', () => send('Downloading update…'));
+    autoUpdater.on('update-downloaded', () => send('Update downloaded — it installs when you close fototo'));
+    autoUpdater.on('error', () => send('Update check failed (offline?)'));
+    autoUpdater.checkForUpdatesAndNotify().catch(() => undefined);
   }
 }
 

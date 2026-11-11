@@ -31,4 +31,6 @@ jobs:
             release/*.exe
             release/*.dmg
             release/*.AppImage
+            release/*.blockmap
+            release/*.yml
           generate_release_notes: true
