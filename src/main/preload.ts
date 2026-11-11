@@ -1,8 +1,16 @@
 import { contextBridge, ipcRenderer } from 'electron';
 
 contextBridge.exposeInMainWorld('fototo', {
-  openImage: (): Promise<{ name: string; data: ArrayBuffer } | null> =>
-    ipcRenderer.invoke('open-image'),
+  openImage: (): Promise<{
+    name: string;
+    path: string;
+    data: ArrayBuffer;
+    edits: { exposure: number; contrast: number; saturation: number; temperature: number } | null;
+  } | null> => ipcRenderer.invoke('open-image'),
+  saveEdits: (
+    imagePath: string,
+    edits: { exposure: number; contrast: number; saturation: number; temperature: number },
+  ): Promise<boolean> => ipcRenderer.invoke('save-edits', imagePath, edits),
   saveImage: (data: ArrayBuffer, defaultName: string): Promise<boolean> =>
     ipcRenderer.invoke('save-image', data, defaultName),
   modelStatus: (): Promise<{ label: string; downloaded: boolean }> =>

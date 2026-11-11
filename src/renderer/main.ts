@@ -24,11 +24,22 @@ const sliders: Record<keyof Adjustments, HTMLInputElement> = {
 let processor: ImageProcessor | null = null;
 let bitmap: ImageBitmap | null = null;
 let currentName = 'photo.png';
+let currentPath: string | null = null;
 let adjustments: Adjustments = { ...DEFAULT_ADJUSTMENTS };
 let busy = false;
+let saveTimer: ReturnType<typeof setTimeout> | null = null;
 
 function setStatus(text: string): void {
   statusEl.textContent = text;
+}
+
+function scheduleSave(): void {
+  if (!currentPath) return;
+  if (saveTimer) clearTimeout(saveTimer);
+  saveTimer = setTimeout(() => {
+    saveTimer = null;
+    window.fototo.saveEdits(currentPath!, adjustments).catch(() => undefined);
+  }, 400);
 }
 
 function syncSliders(): void {
@@ -62,7 +73,16 @@ async function loadImage(): Promise<void> {
   saveBtn.disabled = false;
   resetBtn.disabled = false;
   upscaleBtn.disabled = false;
-  resetAdjustments();
+  enhanceBtn.disabled = false;
+  if (result.edits) {
+    adjustments = { ...result.edits };
+    syncSliders();
+    applyAdjustments();
+    setStatus('Loaded saved edits');
+  } else {
+    resetAdjustments();
+  }
+  currentPath = result.path;
 }
 
 function extractPixels(): RawImage | null {
@@ -80,6 +100,7 @@ async function applyResult(result: RawImage): Promise<void> {
   bitmap = await createImageBitmap(imageData);
   processor?.setImage(bitmap);
   resetAdjustments();
+  scheduleSave();
 }
 
 async function runAiAction(button: HTMLButtonElement, run: () => Promise<void>): Promise<void> {
@@ -146,12 +167,16 @@ enhanceBtn.addEventListener('click', enhance);
 
 saveBtn.addEventListener('click', saveImage);
 
-resetBtn.addEventListener('click', resetAdjustments);
+resetBtn.addEventListener('click', () => {
+  resetAdjustments();
+  scheduleSave();
+});
 
 for (const key of Object.keys(sliders) as (keyof Adjustments)[]) {
   sliders[key].addEventListener('input', () => {
     adjustments[key] = Number(sliders[key].value);
     applyAdjustments();
+    scheduleSave();
   });
 }
 

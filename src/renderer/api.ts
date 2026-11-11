@@ -1,6 +1,15 @@
+export interface ImageEdits {
+  exposure: number;
+  contrast: number;
+  saturation: number;
+  temperature: number;
+}
+
 export interface LoadedImage {
   name: string;
+  path: string;
   data: ArrayBuffer;
+  edits: ImageEdits | null;
 }
 
 export interface ModelStatus {
@@ -22,6 +31,7 @@ export interface RawImage {
 
 export interface FototoApi {
   openImage(): Promise<LoadedImage | null>;
+  saveEdits(imagePath: string, edits: ImageEdits): Promise<boolean>;
   saveImage(data: ArrayBuffer, defaultName: string): Promise<boolean>;
   modelStatus(): Promise<ModelStatus>;
   upscaleImage(image: RawImage): Promise<RawImage>;
