@@ -16,6 +16,12 @@
         <button id="upscale-btn" type="button" disabled>Upscale 4× (AI)</button>
         <button id="enhance-btn" type="button" disabled>Enhance light (AI)</button>
         <span id="status"></span>
+        <select id="theme-select" aria-label="Theme">
+          <option value="system">Theme: System</option>
+          <option value="light">Theme: Light</option>
+          <option value="dark">Theme: Dark</option>
+        </select>
+        <button id="help-btn" type="button">Help</button>
       </div>
     </header>
     <main>
@@ -46,6 +52,31 @@
         <input id="temperature" type="range" min="-0.5" max="0.5" step="0.01" value="0" />
       </label>
     </aside>
+    <dialog id="help-dialog">
+      <h2>Help</h2>
+      <h3>Open a photo</h3>
+      <p>Click <strong>Open photo</strong> or drag an image file onto the window. Recently opened photos appear as thumbnails on the start screen.</p>
+      <h3>Adjust</h3>
+      <p>The four sliders update the preview instantly:</p>
+      <ul>
+        <li><strong>Exposure</strong> — brightens or darkens the whole photo</li>
+        <li><strong>Contrast</strong> — separates lights and darks</li>
+        <li><strong>Saturation</strong> — color intensity (0 is black &amp; white)</li>
+        <li><strong>Temperature</strong> — warmer (orange) or cooler (blue) tones</li>
+      </ul>
+      <p>Edits are saved automatically per photo and restored when you reopen it. <strong>Reset</strong> returns the sliders to neutral. Your original file is never modified.</p>
+      <h3>Upscale 4× (AI)</h3>
+      <p>Increases the resolution 4× with Real-ESRGAN. The AI model (~5 MB) downloads once on first use; an internet connection is only needed for that download.</p>
+      <h3>Enhance light (AI)</h3>
+      <p>Brightens dark or underexposed photos with Zero-DCE. This model is included in the app.</p>
+      <h3>Save</h3>
+      <p>Exports the edited photo as a new PNG file (<code>name-fototo.png</code>); the original stays untouched.</p>
+      <h3>Privacy</h3>
+      <p>Everything runs locally on your machine. Photos are never uploaded anywhere.</p>
+      <div class="dialog-actions">
+        <button id="help-close" type="button">Close</button>
+      </div>
+    </dialog>
     <script type="module" src="/src/renderer/main.ts"></script>
   </body>
 </html>

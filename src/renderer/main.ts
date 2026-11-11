@@ -15,6 +15,10 @@ const statusEl = document.getElementById('status') as HTMLSpanElement;
 const fileNameEl = document.getElementById('file-name') as HTMLSpanElement;
 const recentsGrid = document.getElementById('recents-grid') as HTMLDivElement;
 const recentsSection = document.getElementById('recents') as HTMLDivElement;
+const themeSelect = document.getElementById('theme-select') as HTMLSelectElement;
+const helpBtn = document.getElementById('help-btn') as HTMLButtonElement;
+const helpCloseBtn = document.getElementById('help-close') as HTMLButtonElement;
+const helpDialog = document.getElementById('help-dialog') as HTMLDialogElement;
 
 const sliders: Record<keyof Adjustments, HTMLInputElement> = {
   exposure: document.getElementById('exposure') as HTMLInputElement,
@@ -232,6 +236,24 @@ async function saveImage(): Promise<void> {
   const base = dot > 0 ? currentName.slice(0, dot) : currentName;
   await window.fototo.saveImage(data, `${base}-fototo.png`);
 }
+
+function applyTheme(theme: string): void {
+  if (theme === 'system') delete document.documentElement.dataset.theme;
+  else document.documentElement.dataset.theme = theme;
+}
+
+themeSelect.value = localStorage.getItem('fototo-theme') ?? 'system';
+applyTheme(themeSelect.value);
+themeSelect.addEventListener('change', () => {
+  localStorage.setItem('fototo-theme', themeSelect.value);
+  applyTheme(themeSelect.value);
+});
+
+helpBtn.addEventListener('click', () => helpDialog.showModal());
+helpCloseBtn.addEventListener('click', () => helpDialog.close());
+helpDialog.addEventListener('click', (e) => {
+  if (e.target === helpDialog) helpDialog.close();
+});
 
 openBtn.addEventListener('click', loadImage);
 upscaleBtn.addEventListener('click', upscale);
