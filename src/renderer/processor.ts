@@ -90,9 +90,9 @@ export class ImageProcessor {
     gl.drawArrays(gl.TRIANGLES, 0, 6);
   }
 
-  exportBlob(type = 'image/png'): Promise<Blob | null> {
+  exportBlob(type = 'image/png', quality = 0.92): Promise<Blob | null> {
     return new Promise((resolve) => {
-      this.canvas.toBlob(resolve, type);
+      this.canvas.toBlob(resolve, type, quality);
     });
   }
 

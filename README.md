@@ -76,6 +76,7 @@ Note: the macOS build is unsigned, so macOS may show an "unidentified developer"
 - [x] Batch processing (select photos in the gallery, upscale or enhance them all into an output folder)
 - [x] Auto-updates on Windows and Linux (macOS needs a signed build, so it updates by reinstalling)
 - [x] Upscale options: 2×, 4×, or reach a target resolution (2K / 4K / 8K, capped at the model's 4×)
+- [x] Undo/redo history (Ctrl+Z / Ctrl+Y), one-click auto-enhance, and JPEG export with a quality slider
 
 ## Non-destructive edits
 
