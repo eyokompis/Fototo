@@ -722,12 +722,13 @@ function setSelectMode(on: boolean): void {
   void loadGallery();
 }
 
-async function encodePng(result: RawImage): Promise<ArrayBuffer | null> {
+async function encodeImage(result: RawImage): Promise<ArrayBuffer | null> {
   const offscreen = new OffscreenCanvas(result.width, result.height);
   const ctx = offscreen.getContext('2d');
   if (!ctx) return null;
   ctx.putImageData(new ImageData(new Uint8ClampedArray(result.data), result.width, result.height), 0, 0);
-  const blob = await offscreen.convertToBlob({ type: 'image/png' });
+  const type = exportFormat === 'jpeg' ? 'image/jpeg' : 'image/png';
+  const blob = await offscreen.convertToBlob({ type, quality: exportQuality });
   return blob.arrayBuffer();
 }
 
@@ -751,11 +752,13 @@ async function runBatch(op: 'upscale' | 'enhance'): Promise<void> {
       const image = extractPixels(source);
       if (!image) throw new Error('decode failed');
       const result = op === 'upscale' ? await runUpscale(image, name) : await window.fototo.enhanceImage(image);
-      const data = await encodePng(result);
+      const data = await encodeImage(result);
       if (!data) throw new Error('encode failed');
+      const out = exportFormat === 'jpeg' ? withExif(loaded.data, data) : data;
       const dot = loaded.name.lastIndexOf('.');
       const base = dot > 0 ? loaded.name.slice(0, dot) : loaded.name;
-      await window.fototo.saveImageTo(data, outputDir, `${base}-fototo.png`);
+      const ext = exportFormat === 'jpeg' ? 'jpg' : 'png';
+      await window.fototo.saveImageTo(out, outputDir, `${base}-fototo.${ext}`);
       done += 1;
     } catch {
       failed += 1;
