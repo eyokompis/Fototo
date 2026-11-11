@@ -11,6 +11,10 @@ contextBridge.exposeInMainWorld('fototo', {
     image: { data: ArrayBuffer; width: number; height: number },
   ): Promise<{ data: ArrayBuffer; width: number; height: number }> =>
     ipcRenderer.invoke('ai:upscale', image),
+  enhanceImage: (
+    image: { data: ArrayBuffer; width: number; height: number },
+  ): Promise<{ data: ArrayBuffer; width: number; height: number }> =>
+    ipcRenderer.invoke('ai:enhance', image),
   onProgress: (callback: (progress: { stage: string; done: number; total: number }) => void): (() => void) => {
     const listener = (_event: unknown, progress: { stage: string; done: number; total: number }) =>
       callback(progress);

@@ -25,6 +25,7 @@ export interface FototoApi {
   saveImage(data: ArrayBuffer, defaultName: string): Promise<boolean>;
   modelStatus(): Promise<ModelStatus>;
   upscaleImage(image: RawImage): Promise<RawImage>;
+  enhanceImage(image: RawImage): Promise<RawImage>;
   onProgress(callback: (progress: Progress) => void): () => void;
 }
 

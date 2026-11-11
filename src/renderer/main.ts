@@ -1,4 +1,5 @@
 import { DEFAULT_ADJUSTMENTS, ImageProcessor, type Adjustments } from './processor';
+import type { RawImage } from './api';
 import './api';
 import './style.css';
 
@@ -9,6 +10,7 @@ const openBtn = document.getElementById('open-btn') as HTMLButtonElement;
 const saveBtn = document.getElementById('save-btn') as HTMLButtonElement;
 const resetBtn = document.getElementById('reset-btn') as HTMLButtonElement;
 const upscaleBtn = document.getElementById('upscale-btn') as HTMLButtonElement;
+const enhanceBtn = document.getElementById('enhance-btn') as HTMLButtonElement;
 const statusEl = document.getElementById('status') as HTMLSpanElement;
 const fileNameEl = document.getElementById('file-name') as HTMLSpanElement;
 
@@ -63,43 +65,69 @@ async function loadImage(): Promise<void> {
   resetAdjustments();
 }
 
-async function upscale(): Promise<void> {
+function extractPixels(): RawImage | null {
+  if (!bitmap) return null;
+  const offscreen = new OffscreenCanvas(bitmap.width, bitmap.height);
+  const ctx = offscreen.getContext('2d', { willReadFrequently: true });
+  if (!ctx) return null;
+  ctx.drawImage(bitmap, 0, 0);
+  const pixels = ctx.getImageData(0, 0, bitmap.width, bitmap.height);
+  return { data: pixels.data.buffer as ArrayBuffer, width: bitmap.width, height: bitmap.height };
+}
+
+async function applyResult(result: RawImage): Promise<void> {
+  const imageData = new ImageData(new Uint8ClampedArray(result.data), result.width, result.height);
+  bitmap = await createImageBitmap(imageData);
+  processor?.setImage(bitmap);
+  resetAdjustments();
+}
+
+async function runAiAction(button: HTMLButtonElement, run: () => Promise<void>): Promise<void> {
   if (!processor || !bitmap || busy) return;
   busy = true;
-  upscaleBtn.disabled = true;
+  button.disabled = true;
   saveBtn.disabled = true;
   try {
+    await run();
+  } catch (error) {
+    setStatus(`AI action failed: ${error instanceof Error ? error.message : String(error)}`);
+  } finally {
+    busy = false;
+    button.disabled = false;
+    saveBtn.disabled = false;
+  }
+}
+
+async function upscale(): Promise<void> {
+  await runAiAction(upscaleBtn, async () => {
+    const image = extractPixels();
+    if (!image) return;
     const status = await window.fototo.modelStatus();
     setStatus(status.downloaded ? 'Upscaling…' : 'Downloading AI model (first run)…');
-
-    const offscreen = new OffscreenCanvas(bitmap.width, bitmap.height);
-    const ctx = offscreen.getContext('2d', { willReadFrequently: true });
-    if (!ctx) throw new Error('Canvas 2D context unavailable');
-    ctx.drawImage(bitmap, 0, 0);
-    const pixels = ctx.getImageData(0, 0, bitmap.width, bitmap.height);
-    const data = pixels.data.buffer as ArrayBuffer;
 
     const unsubscribe = window.fototo.onProgress(({ stage, done, total }) => {
       if (stage === 'download') setStatus(`Downloading model ${done}/${total}…`);
       else setStatus(`Upscaling tile ${done}/${total}…`);
     });
     try {
-      const result = await window.fototo.upscaleImage({ data, width: bitmap.width, height: bitmap.height });
-      const upscaled = new ImageData(new Uint8ClampedArray(result.data), result.width, result.height);
-      bitmap = await createImageBitmap(upscaled);
-      processor.setImage(bitmap);
-      resetAdjustments();
+      const result = await window.fototo.upscaleImage(image);
+      await applyResult(result);
       setStatus(`Upscaled to ${result.width}×${result.height}`);
     } finally {
       unsubscribe();
     }
-  } catch (error) {
-    setStatus(`Upscale failed: ${error instanceof Error ? error.message : String(error)}`);
-  } finally {
-    busy = false;
-    upscaleBtn.disabled = false;
-    saveBtn.disabled = false;
-  }
+  });
+}
+
+async function enhance(): Promise<void> {
+  await runAiAction(enhanceBtn, async () => {
+    const image = extractPixels();
+    if (!image) return;
+    setStatus('Enhancing light…');
+    const result = await window.fototo.enhanceImage(image);
+    await applyResult(result);
+    setStatus('Light enhanced');
+  });
 }
 
 async function saveImage(): Promise<void> {
@@ -114,6 +142,7 @@ async function saveImage(): Promise<void> {
 
 openBtn.addEventListener('click', loadImage);
 upscaleBtn.addEventListener('click', upscale);
+enhanceBtn.addEventListener('click', enhance);
 
 saveBtn.addEventListener('click', saveImage);
 

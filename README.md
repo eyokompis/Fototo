@@ -6,7 +6,9 @@ Enhance the quality, light and upscale your photos, locally or with AI.
 
 - **Electron + TypeScript** desktop app (Vite for the renderer build)
 - **WebGL2** real-time local adjustments: exposure, contrast, saturation, temperature
-- **ONNX Runtime** (planned) for on-device AI upscaling (Real-ESRGAN 2x/4x) and low-light enhancement
+- **ONNX Runtime** for on-device AI: Real-ESRGAN x4 upscaling (tiled inference) and Zero-DCE low-light enhancement
+
+The Zero-DCE model (`models/zero-dce.onnx`, ~320 KB) is bundled with the app; the Real-ESRGAN model (~5 MB) downloads on first use. Zero-DCE weights are from [Li-Chongyi/Zero-DCE](https://github.com/Li-Chongyi/Zero-DCE) (CVPR 2020), converted to ONNX with the 8-iteration curve enhancement baked in.
 
 Photos never leave your machine.
 
@@ -33,7 +35,7 @@ In one terminal run `npm run dev`, and in a second terminal `npx electron .` for
 
 - [x] App shell: Electron main/preload/renderer with secure IPC
 - [x] WebGL2 adjustment pipeline (exposure, contrast, saturation, temperature)
+- [x] AI upscaling via ONNX Runtime (Real-ESRGAN x4, tiled, model downloaded on first use)
+- [x] Low-light enhancement via ONNX Runtime (Zero-DCE, bundled model)
 - [ ] Sidecar edit metadata (non-destructive edits)
 - [ ] Photo library with SQLite index
-- [ ] AI upscaling via ONNX Runtime (Real-ESRGAN)
-- [ ] Low-light enhancement model

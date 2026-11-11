@@ -2,6 +2,7 @@ import { app, BrowserWindow, dialog, ipcMain } from 'electron';
 import { promises as fs } from 'node:fs';
 import path from 'node:path';
 import { downloadModel, isModelDownloaded, REAL_ESRGAN_X4, upscaleImage } from './upscaler';
+import { enhanceLowLight } from './enhancer';
 
 const isDev = !app.isPackaged;
 
@@ -56,6 +57,12 @@ ipcMain.handle('ai:upscale', async (event, image: { data: ArrayBuffer; width: nu
   }
   const rgba = new Uint8ClampedArray(image.data);
   const result = await upscaleImage(REAL_ESRGAN_X4, rgba, image.width, image.height, send);
+  return { data: result.data.buffer, width: result.width, height: result.height };
+});
+
+ipcMain.handle('ai:enhance', async (_event, image: { data: ArrayBuffer; width: number; height: number }) => {
+  const rgba = new Uint8ClampedArray(image.data);
+  const result = await enhanceLowLight(rgba, image.width, image.height);
   return { data: result.data.buffer, width: result.width, height: result.height };
 });
 
