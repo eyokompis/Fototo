@@ -42,7 +42,9 @@ export interface FototoApi {
   openImageAt(imagePath: string): Promise<LoadedImage | null>;
   saveEdits(imagePath: string, edits: ImageEdits): Promise<boolean>;
   recordPhoto(imagePath: string, name: string, thumbnail: string | null): Promise<boolean>;
-  recentPhotos(): Promise<LibraryEntry[]>;
+  recentPhotos(limit?: number): Promise<LibraryEntry[]>;
+  libraryPhotos(limit: number): Promise<LibraryEntry[]>;
+  importFolder(): Promise<number>;
   saveImage(data: ArrayBuffer, defaultName: string): Promise<boolean>;
   modelStatus(): Promise<ModelStatus>;
   upscaleImage(image: RawImage): Promise<RawImage>;

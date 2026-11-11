@@ -123,10 +123,36 @@ select {
 
 main {
   grid-area: main;
+  position: relative;
   display: flex;
   align-items: center;
   justify-content: center;
   overflow: hidden;
+}
+
+.transform-row {
+  display: flex;
+  gap: 8px;
+}
+
+.transform-row button {
+  flex: 1;
+  padding: 6px 8px;
+}
+
+#crop-overlay {
+  position: absolute;
+  cursor: crosshair;
+  touch-action: none;
+  z-index: 2;
+}
+
+#crop-selection {
+  position: absolute;
+  border: 1px solid #ffffff;
+  outline: 1px solid rgba(0, 0, 0, 0.6);
+  box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.55);
+  pointer-events: none;
 }
 
 #empty-state[hidden],
@@ -237,6 +263,80 @@ dialog::backdrop {
 dialog h2 {
   font-size: 17px;
   margin: 0 0 12px;
+}
+
+#gallery-dialog {
+  width: min(920px, calc(100vw - 100px));
+  height: min(660px, 85vh);
+}
+
+#gallery-dialog[open] {
+  display: flex;
+  flex-direction: column;
+}
+
+.gallery-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.gallery-head h2 {
+  margin: 0;
+}
+
+.gallery-head div {
+  display: flex;
+  gap: 8px;
+}
+
+#gallery-grid {
+  overflow: auto;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, 140px);
+  gap: 12px;
+  justify-content: center;
+  padding: 4px 0;
+}
+
+.gallery-item {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 6px;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  width: 140px;
+  cursor: pointer;
+  text-align: left;
+}
+
+.gallery-item:hover {
+  border-color: var(--accent);
+}
+
+.gallery-item img {
+  width: 100%;
+  height: 104px;
+  object-fit: cover;
+  border-radius: 4px;
+}
+
+.gallery-item span {
+  font-size: 11px;
+  color: var(--card-text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+#gallery-empty {
+  color: var(--muted);
+  font-size: 13px;
+  text-align: center;
 }
 
 dialog h3 {

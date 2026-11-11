@@ -15,6 +15,22 @@ const statusEl = document.getElementById('status') as HTMLSpanElement;
 const fileNameEl = document.getElementById('file-name') as HTMLSpanElement;
 const recentsGrid = document.getElementById('recents-grid') as HTMLDivElement;
 const recentsSection = document.getElementById('recents') as HTMLDivElement;
+const galleryBtn = document.getElementById('gallery-btn') as HTMLButtonElement;
+const galleryDialog = document.getElementById('gallery-dialog') as HTMLDialogElement;
+const galleryCloseBtn = document.getElementById('gallery-close') as HTMLButtonElement;
+const galleryGrid = document.getElementById('gallery-grid') as HTMLDivElement;
+const galleryEmpty = document.getElementById('gallery-empty') as HTMLParagraphElement;
+const importFolderBtn = document.getElementById('import-folder-btn') as HTMLButtonElement;
+const rotateCcwBtn = document.getElementById('rotate-ccw') as HTMLButtonElement;
+const rotateCwBtn = document.getElementById('rotate-cw') as HTMLButtonElement;
+const cropBtn = document.getElementById('crop-btn') as HTMLButtonElement;
+const cropApplyBtn = document.getElementById('crop-apply') as HTMLButtonElement;
+const cropCancelBtn = document.getElementById('crop-cancel') as HTMLButtonElement;
+const transformRow = document.getElementById('transform-row') as HTMLDivElement;
+const cropActions = document.getElementById('crop-actions') as HTMLDivElement;
+const cropOverlay = document.getElementById('crop-overlay') as HTMLDivElement;
+const cropSelection = document.getElementById('crop-selection') as HTMLDivElement;
+const mainEl = document.querySelector('main') as HTMLElement;
 const themeSelect = document.getElementById('theme-select') as HTMLSelectElement;
 const helpBtn = document.getElementById('help-btn') as HTMLButtonElement;
 const helpCloseBtn = document.getElementById('help-close') as HTMLButtonElement;
@@ -34,6 +50,9 @@ let currentPath: string | null = null;
 let adjustments: Adjustments = { ...DEFAULT_ADJUSTMENTS };
 let busy = false;
 let saveTimer: ReturnType<typeof setTimeout> | null = null;
+let cropping = false;
+let cropDragging = false;
+let cropOrigin: { x: number; y: number } | null = null;
 
 function setStatus(text: string): void {
   statusEl.textContent = text;
@@ -81,6 +100,7 @@ async function openRecent(imagePath: string): Promise<void> {
 }
 
 async function applyLoadedImage(result: LoadedImage): Promise<void> {
+  exitCrop();
   bitmap = await createImageBitmap(new Blob([result.data]));
   currentName = result.name;
   currentPath = result.path;
@@ -227,6 +247,132 @@ async function enhance(): Promise<void> {
   });
 }
 
+function positionCropOverlay(): void {
+  const rect = canvas.getBoundingClientRect();
+  const base = mainEl.getBoundingClientRect();
+  cropOverlay.style.left = `${rect.left - base.left}px`;
+  cropOverlay.style.top = `${rect.top - base.top}px`;
+  cropOverlay.style.width = `${rect.width}px`;
+  cropOverlay.style.height = `${rect.height}px`;
+}
+
+function enterCrop(): void {
+  if (!processor || !bitmap || busy) return;
+  cropping = true;
+  transformRow.hidden = true;
+  cropActions.hidden = false;
+  positionCropOverlay();
+  cropOverlay.hidden = false;
+}
+
+function exitCrop(): void {
+  cropping = false;
+  cropDragging = false;
+  cropOrigin = null;
+  cropOverlay.hidden = true;
+  cropSelection.style.left = '';
+  cropSelection.style.top = '';
+  cropSelection.style.width = '';
+  cropSelection.style.height = '';
+  cropActions.hidden = true;
+  transformRow.hidden = false;
+}
+
+function updateCropSelection(clientX: number, clientY: number): void {
+  if (!cropOrigin) return;
+  const rect = cropOverlay.getBoundingClientRect();
+  const x = Math.min(Math.max(clientX - rect.left, 0), rect.width);
+  const y = Math.min(Math.max(clientY - rect.top, 0), rect.height);
+  cropSelection.style.left = `${Math.min(cropOrigin.x, x)}px`;
+  cropSelection.style.top = `${Math.min(cropOrigin.y, y)}px`;
+  cropSelection.style.width = `${Math.abs(x - cropOrigin.x)}px`;
+  cropSelection.style.height = `${Math.abs(y - cropOrigin.y)}px`;
+}
+
+async function applyCrop(): Promise<void> {
+  if (!bitmap || !processor) return;
+  const overlayRect = cropOverlay.getBoundingClientRect();
+  const selRect = cropSelection.getBoundingClientRect();
+  if (selRect.width < 6 || selRect.height < 6) {
+    exitCrop();
+    return;
+  }
+  const sx = bitmap.width / overlayRect.width;
+  const sy = bitmap.height / overlayRect.height;
+  const x = Math.max(0, Math.round((selRect.left - overlayRect.left) * sx));
+  const y = Math.max(0, Math.round((selRect.top - overlayRect.top) * sy));
+  const w = Math.min(bitmap.width - x, Math.max(1, Math.round(selRect.width * sx)));
+  const h = Math.min(bitmap.height - y, Math.max(1, Math.round(selRect.height * sy)));
+  if (w < 8 || h < 8) {
+    setStatus('Crop selection is too small');
+    return;
+  }
+  const offscreen = new OffscreenCanvas(w, h);
+  const ctx = offscreen.getContext('2d');
+  if (!ctx) return;
+  ctx.drawImage(bitmap, x, y, w, h, 0, 0, w, h);
+  bitmap = await createImageBitmap(offscreen);
+  processor.setImage(bitmap);
+  applyAdjustments();
+  recordThumbnail();
+  setStatus(`Cropped to ${w}×${h}`);
+  exitCrop();
+}
+
+async function rotateBy(deg: number): Promise<void> {
+  if (!bitmap || !processor || busy) return;
+  busy = true;
+  try {
+    const offscreen = new OffscreenCanvas(bitmap.height, bitmap.width);
+    const ctx = offscreen.getContext('2d');
+    if (!ctx) return;
+    ctx.translate(offscreen.width / 2, offscreen.height / 2);
+    ctx.rotate((deg * Math.PI) / 180);
+    ctx.drawImage(bitmap, -bitmap.width / 2, -bitmap.height / 2);
+    bitmap = await createImageBitmap(offscreen);
+    processor.setImage(bitmap);
+    applyAdjustments();
+    recordThumbnail();
+    setStatus(`Rotated to ${bitmap.width}×${bitmap.height}`);
+  } finally {
+    busy = false;
+  }
+}
+
+async function loadGallery(): Promise<void> {
+  try {
+    const entries = await window.fototo.libraryPhotos(2000);
+    galleryEmpty.hidden = entries.length > 0;
+    galleryGrid.replaceChildren();
+    for (const entry of entries) {
+      const item = document.createElement('button');
+      item.className = 'gallery-item';
+      item.title = entry.path;
+      if (entry.thumbnail) {
+        const img = document.createElement('img');
+        img.src = entry.thumbnail;
+        img.alt = entry.name;
+        img.loading = 'lazy';
+        item.appendChild(img);
+      } else {
+        const placeholder = document.createElement('span');
+        placeholder.textContent = '🖼';
+        item.appendChild(placeholder);
+      }
+      const label = document.createElement('span');
+      label.textContent = entry.name;
+      item.appendChild(label);
+      item.addEventListener('click', () => {
+        galleryDialog.close();
+        void openRecent(entry.path);
+      });
+      galleryGrid.appendChild(item);
+    }
+  } catch {
+    void 0;
+  }
+}
+
 async function saveImage(): Promise<void> {
   if (!processor) return;
   const blob = await processor.exportBlob();
@@ -247,6 +393,50 @@ applyTheme(themeSelect.value);
 themeSelect.addEventListener('change', () => {
   localStorage.setItem('fototo-theme', themeSelect.value);
   applyTheme(themeSelect.value);
+});
+
+galleryBtn.addEventListener('click', () => {
+  galleryDialog.showModal();
+  void loadGallery();
+});
+galleryCloseBtn.addEventListener('click', () => galleryDialog.close());
+galleryDialog.addEventListener('click', (e) => {
+  if (e.target === galleryDialog) galleryDialog.close();
+});
+importFolderBtn.addEventListener('click', async () => {
+  importFolderBtn.disabled = true;
+  try {
+    const count = await window.fototo.importFolder();
+    setStatus(count > 0 ? `Imported ${count} photo${count === 1 ? '' : 's'}` : 'No images found in that folder');
+  } catch {
+    setStatus('Could not read that folder');
+  } finally {
+    importFolderBtn.disabled = false;
+  }
+  void loadGallery();
+});
+
+rotateCcwBtn.addEventListener('click', () => void rotateBy(-90));
+rotateCwBtn.addEventListener('click', () => void rotateBy(90));
+cropBtn.addEventListener('click', enterCrop);
+cropCancelBtn.addEventListener('click', exitCrop);
+cropApplyBtn.addEventListener('click', () => void applyCrop());
+cropOverlay.addEventListener('mousedown', (e) => {
+  e.preventDefault();
+  if (!cropping) return;
+  const rect = cropOverlay.getBoundingClientRect();
+  cropDragging = true;
+  cropOrigin = { x: e.clientX - rect.left, y: e.clientY - rect.top };
+  updateCropSelection(e.clientX, e.clientY);
+});
+window.addEventListener('mousemove', (e) => {
+  if (cropping && cropDragging) updateCropSelection(e.clientX, e.clientY);
+});
+window.addEventListener('mouseup', () => {
+  cropDragging = false;
+});
+window.addEventListener('resize', () => {
+  if (cropping) positionCropOverlay();
 });
 
 helpBtn.addEventListener('click', () => helpDialog.showModal());

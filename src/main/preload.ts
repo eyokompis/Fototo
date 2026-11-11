@@ -29,6 +29,10 @@ contextBridge.exposeInMainWorld('fototo', {
   recentPhotos: (): Promise<
     { path: string; name: string; thumbnail: string | null; openedAt: number }[]
   > => ipcRenderer.invoke('library:recent'),
+  libraryPhotos: (limit: number): Promise<
+    { path: string; name: string; thumbnail: string | null; openedAt: number }[]
+  > => ipcRenderer.invoke('library:recent', limit),
+  importFolder: (): Promise<number> => ipcRenderer.invoke('library:import-folder'),
   saveImage: (data: ArrayBuffer, defaultName: string): Promise<boolean> =>
     ipcRenderer.invoke('save-image', data, defaultName),
   modelStatus: (): Promise<{ label: string; downloaded: boolean }> =>

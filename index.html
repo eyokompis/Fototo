@@ -15,6 +15,7 @@
         <button id="reset-btn" type="button" disabled>Reset</button>
         <button id="upscale-btn" type="button" disabled>Upscale 4× (AI)</button>
         <button id="enhance-btn" type="button" disabled>Enhance light (AI)</button>
+        <button id="gallery-btn" type="button">Gallery</button>
         <span id="status"></span>
         <select id="theme-select" aria-label="Theme">
           <option value="system">Theme: System</option>
@@ -25,6 +26,9 @@
       </div>
     </header>
     <main>
+      <div id="crop-overlay" hidden>
+        <div id="crop-selection"></div>
+      </div>
       <div id="empty-state">
         <p>Open a photo to start editing. Everything stays on your machine.</p>
         <div id="recents" hidden>
@@ -35,6 +39,15 @@
       <canvas id="canvas" hidden></canvas>
     </main>
     <aside id="controls" hidden>
+      <div id="transform-row" class="transform-row">
+        <button id="rotate-ccw" type="button" title="Rotate 90° counter-clockwise">⟲</button>
+        <button id="rotate-cw" type="button" title="Rotate 90° clockwise">⟳</button>
+        <button id="crop-btn" type="button">Crop</button>
+      </div>
+      <div id="crop-actions" class="transform-row" hidden>
+        <button id="crop-apply" type="button">Apply crop</button>
+        <button id="crop-cancel" type="button">Cancel</button>
+      </div>
       <label>
         Exposure <span class="value"></span>
         <input id="exposure" type="range" min="-2" max="2" step="0.01" value="0" />
@@ -52,6 +65,17 @@
         <input id="temperature" type="range" min="-0.5" max="0.5" step="0.01" value="0" />
       </label>
     </aside>
+    <dialog id="gallery-dialog">
+      <div class="gallery-head">
+        <h2>Gallery</h2>
+        <div>
+          <button id="import-folder-btn" type="button">Add folder</button>
+          <button id="gallery-close" type="button">Close</button>
+        </div>
+      </div>
+      <div id="gallery-grid"></div>
+      <p id="gallery-empty" hidden>No photos yet. Open a photo or add a folder.</p>
+    </dialog>
     <dialog id="help-dialog">
       <h2>Help</h2>
       <h3>Open a photo</h3>
@@ -69,6 +93,10 @@
       <p>Increases the resolution 4× with Real-ESRGAN. The AI model (~5 MB) downloads once on first use; an internet connection is only needed for that download.</p>
       <h3>Enhance light (AI)</h3>
       <p>Brightens dark or underexposed photos with Zero-DCE. This model is included in the app.</p>
+      <h3>Rotate &amp; crop</h3>
+      <p><strong>⟲ / ⟳</strong> rotate the photo by 90°. <strong>Crop</strong> lets you drag a rectangle on the photo — click <strong>Apply crop</strong> to keep only that part, or <strong>Cancel</strong> to discard. The original file is never modified; use <strong>Save</strong> to export the result.</p>
+      <h3>Gallery</h3>
+      <p>Click <strong>Gallery</strong> to browse every photo in your library. <strong>Add folder</strong> imports all images from a folder at once (thumbnails appear once a photo has been opened).</p>
       <h3>Save</h3>
       <p>Exports the edited photo as a new PNG file (<code>name-fototo.png</code>); the original stays untouched.</p>
       <h3>Privacy</h3>
