@@ -73,7 +73,7 @@ Note: the macOS build is unsigned, so macOS may show an "unidentified developer"
 - [x] Packaging with electron-builder (NSIS / DMG / AppImage) and custom app icon
 - [x] Theme switcher (system / light / dark) and in-app help
 - [x] Gallery view with folder import, plus 90° rotation and crop
-- [x] Batch processing (select photos in the gallery, upscale or enhance them all into an output folder)
+- [x] Batch processing (select photos in the gallery, upscale or enhance them all into an output folder, in your chosen export format)
 - [x] Auto-updates on Windows and Linux (macOS needs a signed build, so it updates by reinstalling)
 - [x] Upscale options: 2×, 4×, or reach a target resolution (2K / 4K / 8K, capped at the model's 4×)
 - [x] Undo/redo history (Ctrl+Z / Ctrl+Y), one-click auto-enhance, and JPEG export with a quality slider
