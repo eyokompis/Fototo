@@ -43,6 +43,19 @@ Notes:
 - `onnxruntime-node` is unpacked from the asar and cross-platform/CUDA binaries are pruned per OS to keep installers small
 - Output lands in `release/` (gitignored)
 
+## Releases
+
+Installers are built automatically for every version tag. To publish a release:
+
+```sh
+git tag v0.1.0
+git push origin v0.1.0
+```
+
+The release workflow builds the NSIS installer (Windows), DMG (macOS), and AppImage (Linux) on GitHub Actions and attaches them to a GitHub Release. Download them from the repo's Releases page.
+
+Note: the macOS build is unsigned, so macOS may show an "unidentified developer" warning (right-click → Open, or allow it in System Settings → Privacy & Security).
+
 ## Roadmap
 
 - [x] App shell: Electron main/preload/renderer with secure IPC
