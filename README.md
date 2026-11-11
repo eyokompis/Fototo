@@ -52,7 +52,7 @@ git tag v0.1.0
 git push origin v0.1.0
 ```
 
-The release workflow builds the NSIS installer (Windows), DMG (macOS), and AppImage (Linux) on GitHub Actions and attaches them to a GitHub Release. Download them from the repo's Releases page.
+The release workflow builds the NSIS installer (Windows), DMG (macOS, Apple Silicon and Intel), and AppImage (Linux) on GitHub Actions and attaches them to a GitHub Release. Download them from the repo's Releases page.
 
 Note: the macOS build is unsigned, so macOS may show an "unidentified developer" warning (right-click → Open, or allow it in System Settings → Privacy & Security).
 

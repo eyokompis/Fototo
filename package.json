@@ -58,7 +58,15 @@
       ]
     },
     "mac": {
-      "target": "dmg",
+      "target": [
+        {
+          "target": "dmg",
+          "arch": [
+            "x64",
+            "arm64"
+          ]
+        }
+      ],
       "category": "public.app-category.photography",
       "files": [
         "!**/node_modules/onnxruntime-node/bin/napi-v6/linux/**",
