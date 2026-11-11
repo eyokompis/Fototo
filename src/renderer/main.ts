@@ -9,6 +9,12 @@ const controls = document.getElementById('controls') as HTMLDivElement;
 const openBtn = document.getElementById('open-btn') as HTMLButtonElement;
 const saveBtn = document.getElementById('save-btn') as HTMLButtonElement;
 const resetBtn = document.getElementById('reset-btn') as HTMLButtonElement;
+const undoBtn = document.getElementById('undo-btn') as HTMLButtonElement;
+const redoBtn = document.getElementById('redo-btn') as HTMLButtonElement;
+const autoEnhanceBtn = document.getElementById('auto-enhance-btn') as HTMLButtonElement;
+const exportFormatSel = document.getElementById('export-format') as HTMLSelectElement;
+const jpegQualityInput = document.getElementById('jpeg-quality') as HTMLInputElement;
+const jpegQualityLabel = document.getElementById('jpeg-quality-label') as HTMLLabelElement;
 const up2Btn = document.getElementById('up2-btn') as HTMLButtonElement;
 const up4Btn = document.getElementById('up4-btn') as HTMLButtonElement;
 const res2kBtn = document.getElementById('res-2k') as HTMLButtonElement;
@@ -67,6 +73,18 @@ let busy = false;
 let saveTimer: ReturnType<typeof setTimeout> | null = null;
 let zoom: number | null = null;
 let originalBitmap: ImageBitmap | null = null;
+let exportFormat: 'png' | 'jpeg' = 'png';
+let exportQuality = 0.9;
+
+interface HistoryEntry {
+  blob: Blob;
+  width: number;
+  height: number;
+  adjustments: Adjustments;
+}
+
+let history: HistoryEntry[] = [];
+let historyIndex = -1;
 let progressTimer: ReturnType<typeof setTimeout> | null = null;
 let cropping = false;
 let cropDragging = false;
@@ -133,6 +151,62 @@ function resetAdjustments(): void {
   applyAdjustments();
 }
 
+async function takeSnapshot(): Promise<HistoryEntry> {
+  const offscreen = new OffscreenCanvas(bitmap!.width, bitmap!.height);
+  const ctx = offscreen.getContext('2d');
+  if (!ctx) throw new Error('snapshot failed');
+  ctx.drawImage(bitmap!, 0, 0);
+  const blob = await offscreen.convertToBlob({ type: 'image/png' });
+  return { blob, width: bitmap!.width, height: bitmap!.height, adjustments: { ...adjustments } };
+}
+
+async function commitHistory(): Promise<void> {
+  if (!bitmap) return;
+  try {
+    const entry = await takeSnapshot();
+    history = history.slice(0, historyIndex + 1);
+    history.push(entry);
+    if (history.length > 20) history.shift();
+    historyIndex = history.length - 1;
+  } catch {
+    return;
+  }
+  updateHistoryButtons();
+}
+
+async function restoreHistory(index: number): Promise<void> {
+  const entry = history[index];
+  if (!entry || busy) return;
+  busy = true;
+  try {
+    bitmap = await createImageBitmap(entry.blob);
+    historyIndex = index;
+    processor?.setImage(bitmap);
+    applyZoom();
+    adjustments = { ...entry.adjustments };
+    syncSliders();
+    applyAdjustments();
+    recordThumbnail();
+    setStatus(`Restored ${bitmap.width}×${bitmap.height}`);
+  } finally {
+    busy = false;
+  }
+  updateHistoryButtons();
+}
+
+function updateHistoryButtons(): void {
+  undoBtn.disabled = historyIndex <= 0;
+  redoBtn.disabled = historyIndex < 0 || historyIndex >= history.length - 1;
+}
+
+async function undo(): Promise<void> {
+  if (historyIndex > 0) await restoreHistory(historyIndex - 1);
+}
+
+async function redo(): Promise<void> {
+  if (historyIndex >= 0 && historyIndex < history.length - 1) await restoreHistory(historyIndex + 1);
+}
+
 async function loadImage(): Promise<void> {
   const result = await window.fototo.openImage();
   if (!result) return;
@@ -174,6 +248,9 @@ async function applyLoadedImage(result: LoadedImage): Promise<void> {
   } else {
     resetAdjustments();
   }
+  history = [];
+  historyIndex = -1;
+  await commitHistory();
   recordThumbnail();
 }
 
@@ -302,6 +379,7 @@ async function runAiAction(button: HTMLButtonElement, run: () => Promise<void>):
   saveBtn.disabled = true;
   try {
     await run();
+    await commitHistory();
   } catch (error) {
     setStatus(`AI action failed: ${error instanceof Error ? error.message : String(error)}`);
   } finally {
@@ -460,6 +538,7 @@ async function applyCrop(): Promise<void> {
   applyAdjustments();
   recordThumbnail();
   setStatus(`Cropped to ${w}×${h}`);
+  await commitHistory();
   exitCrop();
 }
 
@@ -479,6 +558,7 @@ async function rotateBy(deg: number): Promise<void> {
     applyAdjustments();
     recordThumbnail();
     setStatus(`Rotated to ${bitmap.width}×${bitmap.height}`);
+    await commitHistory();
   } finally {
     busy = false;
   }
@@ -590,14 +670,49 @@ async function runBatch(op: 'upscale' | 'enhance'): Promise<void> {
   setSelectMode(false);
 }
 
+function autoEnhance(): void {
+  if (!bitmap || busy) return;
+  const size = 128;
+  const offscreen = new OffscreenCanvas(size, size);
+  const ctx = offscreen.getContext('2d', { willReadFrequently: true });
+  if (!ctx) return;
+  ctx.drawImage(bitmap, 0, 0, size, size);
+  const px = ctx.getImageData(0, 0, size, size).data;
+  const n = size * size;
+  const luma: number[] = [];
+  let rSum = 0, gSum = 0, bSum = 0, satSum = 0;
+  for (let i = 0; i < n; i++) {
+    const r = px[i * 4] / 255, g = px[i * 4 + 1] / 255, b = px[i * 4 + 2] / 255;
+    rSum += r; gSum += g; bSum += b;
+    luma.push(0.2126 * r + 0.7152 * g + 0.0722 * b);
+    const mx = Math.max(r, g, b), mn = Math.min(r, g, b);
+    satSum += mx === 0 ? 0 : (mx - mn) / mx;
+  }
+  luma.sort((a, b) => a - b);
+  const pct = (p: number) => luma[Math.min(n - 1, Math.max(0, Math.round(p * (n - 1))))];
+  const lo = pct(0.02), hi = pct(0.98), mid = pct(0.5);
+  const range = Math.max(0.05, hi - lo);
+  const exposure = Math.max(-2, Math.min(2, Math.round(Math.log2(0.48 / Math.max(0.05, mid)) * 0.8 * 100) / 100));
+  const contrast = Math.round(Math.max(0.5, Math.min(1.8, 0.9 / range)) * 100) / 100;
+  const saturation = Math.round(Math.max(0.6, Math.min(2, 1 + (0.28 - satSum / n) * 1.2)) * 100) / 100;
+  const temperature = Math.round(Math.max(-0.5, Math.min(0.5, ((bSum - rSum) / n) * 0.8)) * 100) / 100;
+  adjustments = { exposure, contrast, saturation, temperature };
+  syncSliders();
+  applyAdjustments();
+  scheduleSave();
+  void commitHistory().then(() => setStatus('Auto-enhanced'));
+}
+
 async function saveImage(): Promise<void> {
   if (!processor) return;
-  const blob = await processor.exportBlob();
+  const type = exportFormat === 'jpeg' ? 'image/jpeg' : 'image/png';
+  const blob = await processor.exportBlob(type, exportQuality);
   if (!blob) return;
   const data = await blob.arrayBuffer();
   const dot = currentName.lastIndexOf('.');
   const base = dot > 0 ? currentName.slice(0, dot) : currentName;
-  await window.fototo.saveImage(data, `${base}-fototo.png`);
+  const ext = exportFormat === 'jpeg' ? 'jpg' : 'png';
+  await window.fototo.saveImage(data, `${base}-fototo.${ext}`);
 }
 
 function applyTheme(theme: string): void {
@@ -701,6 +816,28 @@ res8kBtn.addEventListener('click', () => void runUpscaleOption(res8kBtn, 7680));
 enhanceBtn.addEventListener('click', enhance);
 
 saveBtn.addEventListener('click', saveImage);
+
+undoBtn.addEventListener('click', () => void undo());
+redoBtn.addEventListener('click', () => void redo());
+autoEnhanceBtn.addEventListener('click', () => autoEnhance());
+window.addEventListener('keydown', (e) => {
+  if (!e.ctrlKey || busy) return;
+  const key = e.key.toLowerCase();
+  if (key === 'z' && !e.shiftKey) {
+    e.preventDefault();
+    void undo();
+  } else if (key === 'y' || (key === 'z' && e.shiftKey)) {
+    e.preventDefault();
+    void redo();
+  }
+});
+exportFormatSel.addEventListener('change', () => {
+  exportFormat = exportFormatSel.value as 'png' | 'jpeg';
+  jpegQualityLabel.hidden = exportFormat !== 'jpeg';
+});
+jpegQualityInput.addEventListener('input', () => {
+  exportQuality = Number(jpegQualityInput.value) / 100;
+});
 
 resetBtn.addEventListener('click', () => {
   resetAdjustments();

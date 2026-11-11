@@ -276,6 +276,11 @@ main {
   display: flex;
   flex-direction: column;
   gap: 18px;
+  overflow-y: auto;
+}
+
+#auto-enhance-btn {
+  width: 100%;
 }
 
 label {
