@@ -1,6 +1,6 @@
 import { app, BrowserWindow, dialog, ipcMain } from 'electron';
 import { autoUpdater } from 'electron-updater';
-import { promises as fs } from 'node:fs';
+import { promises as fs, existsSync, mkdirSync, cpSync } from 'node:fs';
 import path from 'node:path';
 import { downloadModel, isModelDownloaded, REAL_ESRGAN_X4, upscaleImage } from './upscaler';
 import { enhanceLowLight } from './enhancer';
@@ -9,13 +9,34 @@ import { recentPhotos, recordPhoto } from './library';
 
 const isDev = !app.isPackaged;
 
+function migrateUserData(): void {
+  if (!app.isPackaged) return;
+  const newPath = app.getPath('userData');
+  if (path.basename(newPath).toLowerCase() !== 'fototo') return;
+  const oldPath = path.join(path.dirname(newPath), 'fototo');
+  if (!existsSync(oldPath)) return;
+  try {
+    mkdirSync(newPath, { recursive: true });
+    const db = path.join(oldPath, 'library.db');
+    if (existsSync(db) && !existsSync(path.join(newPath, 'library.db'))) {
+      cpSync(db, path.join(newPath, 'library.db'));
+    }
+    const models = path.join(oldPath, 'models');
+    if (existsSync(models) && !existsSync(path.join(newPath, 'models'))) {
+      cpSync(models, path.join(newPath, 'models'), { recursive: true });
+    }
+  } catch {
+    return;
+  }
+}
+
 function createWindow(): void {
   const win = new BrowserWindow({
     width: 1280,
     height: 840,
     minWidth: 960,
     minHeight: 600,
-    title: 'fototo',
+    title: 'Fototo',
     backgroundColor: '#111318',
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
@@ -168,6 +189,7 @@ ipcMain.handle('save-image', async (_event, data: ArrayBuffer, defaultName: stri
 });
 
 app.whenReady().then(() => {
+  migrateUserData();
   createWindow();
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow();

@@ -1,4 +1,4 @@
-# fototo
+# Fototo
 
 Enhance the quality, light and upscale your photos, locally or with AI.
 

@@ -3,11 +3,11 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>fototo</title>
+    <title>Fototo</title>
   </head>
   <body>
     <header>
-      <h1>fototo</h1>
+      <h1>Fototo</h1>
       <span id="file-name"></span>
       <div class="actions">
         <button id="open-btn" type="button">Open photo</button>
@@ -25,6 +25,7 @@
         <button id="help-btn" type="button">Help</button>
       </div>
     </header>
+    <div id="progress" hidden><div id="progress-fill"></div></div>
     <main>
       <div id="crop-overlay" hidden>
         <div id="crop-selection"></div>
@@ -39,6 +40,11 @@
       <canvas id="canvas" hidden></canvas>
     </main>
     <aside id="controls" hidden>
+      <div class="transform-row">
+        <button id="zoom-out" type="button" title="Zoom out">−</button>
+        <button id="zoom-fit" type="button" title="Fit to window">Fit</button>
+        <button id="zoom-in" type="button" title="Zoom in">+</button>
+      </div>
       <div id="transform-row" class="transform-row">
         <button id="rotate-ccw" type="button" title="Rotate 90° counter-clockwise">⟲</button>
         <button id="rotate-cw" type="button" title="Rotate 90° clockwise">⟳</button>
@@ -100,6 +106,8 @@
       <p>Increases the resolution 4× with Real-ESRGAN. The AI model (~5 MB) downloads once on first use; an internet connection is only needed for that download.</p>
       <h3>Enhance light (AI)</h3>
       <p>Brightens dark or underexposed photos with Zero-DCE. This model is included in the app.</p>
+      <h3>Zoom &amp; compare</h3>
+      <p>Use <strong>− / Fit / +</strong> in the sidebar, or hold <strong>Ctrl</strong> and scroll, to zoom. Click and hold the photo to peek at the original, unedited version — release to see your edits.</p>
       <h3>Rotate &amp; crop</h3>
       <p><strong>⟲ / ⟳</strong> rotate the photo by 90°. <strong>Crop</strong> lets you drag a rectangle on the photo — click <strong>Apply crop</strong> to keep only that part, or <strong>Cancel</strong> to discard. The original file is never modified; use <strong>Save</strong> to export the result.</p>
       <h3>Gallery</h3>
