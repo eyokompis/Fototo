@@ -569,6 +569,8 @@ window.fototo
   })
   .catch(() => undefined);
 
+window.fototo.onUpdateStatus((message) => setStatus(message));
+
 loadRecents();
 
 window.addEventListener('dragover', (e) => e.preventDefault());

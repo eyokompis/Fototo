@@ -52,6 +52,7 @@ export interface FototoApi {
   upscaleImage(image: RawImage): Promise<RawImage>;
   enhanceImage(image: RawImage): Promise<RawImage>;
   onProgress(callback: (progress: Progress) => void): () => void;
+  onUpdateStatus(callback: (message: string) => void): () => void;
 }
 
 declare global {

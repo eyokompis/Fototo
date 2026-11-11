@@ -2,6 +2,12 @@
 
 Enhance the quality, light and upscale your photos, locally or with AI.
 
+![fototo](docs/screenshot.png)
+
+A fast, private desktop photo editor: real-time light and color adjustments, one-click AI upscaling (4×) and low-light enhancement, non-destructive edits, a built-in photo library with gallery and batch processing. Everything runs on your machine — photos never leave it.
+
+**[Download the latest installer](https://github.com/eyokompis/fototo/releases/latest)** for Windows, macOS (Apple Silicon & Intel), and Linux.
+
 ## Stack
 
 - **Electron + TypeScript** desktop app (Vite for the renderer build)
@@ -68,6 +74,7 @@ Note: the macOS build is unsigned, so macOS may show an "unidentified developer"
 - [x] Theme switcher (system / light / dark) and in-app help
 - [x] Gallery view with folder import, plus 90° rotation and crop
 - [x] Batch processing (select photos in the gallery, upscale or enhance them all into an output folder)
+- [x] Auto-updates on Windows and Linux (macOS needs a signed build, so it updates by reinstalling)
 
 ## Non-destructive edits
 

@@ -5,6 +5,10 @@
   "description": "Enhance the quality, light and upscale your photos, locally or with AI.",
   "license": "MIT",
   "author": "eyokompis",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/eyokompis/fototo.git"
+  },
   "private": true,
   "main": "dist-electron/main.js",
   "scripts": {
@@ -25,12 +29,18 @@
     "vite": "^6.0.0"
   },
   "dependencies": {
+    "electron-updater": "^6.8.11",
     "onnxruntime-node": "^1.31.1",
     "sql.js": "^1.16.0"
   },
   "build": {
     "appId": "io.github.eyokompis.fototo",
     "productName": "fototo",
+    "publish": {
+      "provider": "github",
+      "owner": "eyokompis",
+      "repo": "fototo"
+    },
     "directories": {
       "output": "release"
     },

@@ -54,4 +54,9 @@ contextBridge.exposeInMainWorld('fototo', {
     ipcRenderer.on('ai:progress', listener);
     return () => ipcRenderer.removeListener('ai:progress', listener);
   },
+  onUpdateStatus: (callback: (message: string) => void): (() => void) => {
+    const listener = (_event: unknown, message: string) => callback(message);
+    ipcRenderer.on('update:status', listener);
+    return () => ipcRenderer.removeListener('update:status', listener);
+  },
 });
