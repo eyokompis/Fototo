@@ -27,6 +27,11 @@ const batchCount = document.getElementById('batch-count') as HTMLSpanElement;
 const batchUpscaleBtn = document.getElementById('batch-upscale') as HTMLButtonElement;
 const batchEnhanceBtn = document.getElementById('batch-enhance') as HTMLButtonElement;
 const batchDoneBtn = document.getElementById('batch-done') as HTMLButtonElement;
+const zoomInBtn = document.getElementById('zoom-in') as HTMLButtonElement;
+const zoomOutBtn = document.getElementById('zoom-out') as HTMLButtonElement;
+const zoomFitBtn = document.getElementById('zoom-fit') as HTMLButtonElement;
+const progressEl = document.getElementById('progress') as HTMLDivElement;
+const progressFill = document.getElementById('progress-fill') as HTMLDivElement;
 const rotateCcwBtn = document.getElementById('rotate-ccw') as HTMLButtonElement;
 const rotateCwBtn = document.getElementById('rotate-cw') as HTMLButtonElement;
 const cropBtn = document.getElementById('crop-btn') as HTMLButtonElement;
@@ -56,6 +61,9 @@ let currentPath: string | null = null;
 let adjustments: Adjustments = { ...DEFAULT_ADJUSTMENTS };
 let busy = false;
 let saveTimer: ReturnType<typeof setTimeout> | null = null;
+let zoom: number | null = null;
+let originalBitmap: ImageBitmap | null = null;
+let progressTimer: ReturnType<typeof setTimeout> | null = null;
 let cropping = false;
 let cropDragging = false;
 let cropOrigin: { x: number; y: number } | null = null;
@@ -65,6 +73,34 @@ const selectedPaths = new Set<string>();
 
 function setStatus(text: string): void {
   statusEl.textContent = text;
+}
+
+function showProgress(label: string, fraction: number | null): void {
+  setStatus(label);
+  progressEl.hidden = false;
+  progressFill.classList.remove('indeterminate');
+  if (fraction === null) {
+    progressFill.classList.add('indeterminate');
+    progressFill.style.width = '';
+  } else {
+    progressFill.style.width = `${Math.round(Math.min(1, Math.max(0, fraction)) * 100)}%`;
+  }
+  if (progressTimer) {
+    clearTimeout(progressTimer);
+    progressTimer = null;
+  }
+}
+
+function finishProgress(message: string): void {
+  setStatus(message);
+  progressFill.classList.remove('indeterminate');
+  progressFill.style.width = '100%';
+  if (progressTimer) clearTimeout(progressTimer);
+  progressTimer = setTimeout(() => {
+    progressEl.hidden = true;
+    progressFill.style.width = '0%';
+    progressTimer = null;
+  }, 1500);
 }
 
 function scheduleSave(): void {
@@ -110,7 +146,11 @@ async function openRecent(imagePath: string): Promise<void> {
 
 async function applyLoadedImage(result: LoadedImage): Promise<void> {
   exitCrop();
+  hideBefore();
   bitmap = await createImageBitmap(new Blob([result.data]));
+  originalBitmap = bitmap;
+  zoom = null;
+  applyZoom();
   currentName = result.name;
   currentPath = result.path;
   fileNameEl.textContent = result.name;
@@ -223,12 +263,15 @@ async function runAiAction(button: HTMLButtonElement, run: () => Promise<void>):
   }
 }
 
-async function runUpscale(image: RawImage): Promise<RawImage> {
+async function runUpscale(image: RawImage, label: string): Promise<RawImage> {
   const status = await window.fototo.modelStatus();
-  setStatus(status.downloaded ? 'Upscaling…' : 'Downloading AI model (first run)…');
+  showProgress(
+    status.downloaded ? `${label} — upscaling…` : `Downloading AI model (first run)…`,
+    status.downloaded ? 0 : null,
+  );
   const unsubscribe = window.fototo.onProgress(({ stage, done, total }) => {
-    if (stage === 'download') setStatus(`Downloading model ${done}/${total}…`);
-    else setStatus(`Upscaling tile ${done}/${total}…`);
+    if (stage === 'download') showProgress(`Downloading AI model — ${done}/${total}`, total > 0 ? done / total : null);
+    else showProgress(`${label} — upscaling tile ${done}/${total}`, total > 0 ? done / total : null);
   });
   try {
     return await window.fototo.upscaleImage(image);
@@ -242,9 +285,9 @@ async function upscale(): Promise<void> {
     if (!bitmap) return;
     const image = extractPixels(bitmap);
     if (!image) return;
-    const result = await runUpscale(image);
+    const result = await runUpscale(image, currentName);
     await applyResult(result);
-    setStatus(`Upscaled to ${result.width}×${result.height}`);
+    finishProgress(`Upscaled to ${result.width}×${result.height}`);
   });
 }
 
@@ -253,11 +296,61 @@ async function enhance(): Promise<void> {
     if (!bitmap) return;
     const image = extractPixels(bitmap);
     if (!image) return;
-    setStatus('Enhancing light…');
+    showProgress(`${currentName} — enhancing light…`, null);
     const result = await window.fototo.enhanceImage(image);
     await applyResult(result);
-    setStatus('Light enhanced');
+    finishProgress('Light enhanced');
   });
+}
+
+function fitScale(): number {
+  if (!bitmap) return 1;
+  const rect = mainEl.getBoundingClientRect();
+  return Math.min(rect.width / bitmap.width, rect.height / bitmap.height);
+}
+
+function setZoom(value: number): void {
+  zoom = Math.min(8, Math.max(0.05, value));
+  applyZoom();
+}
+
+function applyZoom(): void {
+  if (!bitmap) return;
+  if (zoom === null) {
+    canvas.classList.remove('zoomed');
+    canvas.style.width = '';
+    canvas.style.height = '';
+  } else {
+    canvas.classList.add('zoomed');
+    canvas.style.width = `${Math.round(bitmap.width * zoom)}px`;
+    canvas.style.height = `${Math.round(bitmap.height * zoom)}px`;
+  }
+  if (cropping) positionCropOverlay();
+}
+
+const beforeCanvas = document.createElement('canvas');
+beforeCanvas.id = 'before-canvas';
+beforeCanvas.hidden = true;
+mainEl.appendChild(beforeCanvas);
+
+function showBefore(): void {
+  if (!originalBitmap || !bitmap || cropping || busy) return;
+  const rect = canvas.getBoundingClientRect();
+  const base = mainEl.getBoundingClientRect();
+  beforeCanvas.width = originalBitmap.width;
+  beforeCanvas.height = originalBitmap.height;
+  const ctx = beforeCanvas.getContext('2d');
+  if (!ctx) return;
+  ctx.drawImage(originalBitmap, 0, 0);
+  beforeCanvas.style.left = `${rect.left - base.left}px`;
+  beforeCanvas.style.top = `${rect.top - base.top}px`;
+  beforeCanvas.style.width = `${rect.width}px`;
+  beforeCanvas.style.height = `${rect.height}px`;
+  beforeCanvas.hidden = false;
+}
+
+function hideBefore(): void {
+  beforeCanvas.hidden = true;
 }
 
 function positionCropOverlay(): void {
@@ -326,6 +419,7 @@ async function applyCrop(): Promise<void> {
   ctx.drawImage(bitmap, x, y, w, h, 0, 0, w, h);
   bitmap = await createImageBitmap(offscreen);
   processor.setImage(bitmap);
+  applyZoom();
   applyAdjustments();
   recordThumbnail();
   setStatus(`Cropped to ${w}×${h}`);
@@ -344,6 +438,7 @@ async function rotateBy(deg: number): Promise<void> {
     ctx.drawImage(bitmap, -bitmap.width / 2, -bitmap.height / 2);
     bitmap = await createImageBitmap(offscreen);
     processor.setImage(bitmap);
+    applyZoom();
     applyAdjustments();
     recordThumbnail();
     setStatus(`Rotated to ${bitmap.width}×${bitmap.height}`);
@@ -435,14 +530,14 @@ async function runBatch(op: 'upscale' | 'enhance'): Promise<void> {
   for (let i = 0; i < paths.length; i++) {
     const photoPath = paths[i];
     const name = photoPath.split(/[\\/]/).pop() ?? photoPath;
-    setStatus(`Batch ${i + 1}/${paths.length}: ${name}`);
+    showProgress(`Batch ${i + 1}/${paths.length} — ${name}`, i / paths.length);
     try {
       const loaded = await window.fototo.openImageAt(photoPath);
       if (!loaded) throw new Error('unreadable');
       const source = await createImageBitmap(new Blob([loaded.data]));
       const image = extractPixels(source);
       if (!image) throw new Error('decode failed');
-      const result = op === 'upscale' ? await runUpscale(image) : await window.fototo.enhanceImage(image);
+      const result = op === 'upscale' ? await runUpscale(image, name) : await window.fototo.enhanceImage(image);
       const data = await encodePng(result);
       if (!data) throw new Error('encode failed');
       const dot = loaded.name.lastIndexOf('.');
@@ -454,7 +549,7 @@ async function runBatch(op: 'upscale' | 'enhance'): Promise<void> {
     }
   }
   batchBusy = false;
-  setStatus(`Batch complete: ${done} saved${failed > 0 ? `, ${failed} failed` : ''}`);
+  finishProgress(`Batch complete: ${done} saved${failed > 0 ? `, ${failed} failed` : ''}`);
   setSelectMode(false);
 }
 
@@ -511,6 +606,25 @@ importFolderBtn.addEventListener('click', async () => {
   }
   void loadGallery();
 });
+
+zoomInBtn.addEventListener('click', () => setZoom((zoom ?? fitScale()) * 1.25));
+zoomOutBtn.addEventListener('click', () => setZoom((zoom ?? fitScale()) / 1.25));
+zoomFitBtn.addEventListener('click', () => {
+  zoom = null;
+  applyZoom();
+});
+mainEl.addEventListener(
+  'wheel',
+  (e) => {
+    if (!e.ctrlKey || !bitmap) return;
+    e.preventDefault();
+    setZoom((zoom ?? fitScale()) * (e.deltaY < 0 ? 1.25 : 0.8));
+  },
+  { passive: false },
+);
+
+canvas.addEventListener('mousedown', () => showBefore());
+window.addEventListener('mouseup', hideBefore);
 
 rotateCcwBtn.addEventListener('click', () => void rotateBy(-90));
 rotateCwBtn.addEventListener('click', () => void rotateBy(90));
