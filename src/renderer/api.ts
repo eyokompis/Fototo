@@ -12,6 +12,13 @@ export interface LoadedImage {
   edits: ImageEdits | null;
 }
 
+export interface LibraryEntry {
+  path: string;
+  name: string;
+  thumbnail: string | null;
+  openedAt: number;
+}
+
 export interface ModelStatus {
   label: string;
   downloaded: boolean;
@@ -31,7 +38,10 @@ export interface RawImage {
 
 export interface FototoApi {
   openImage(): Promise<LoadedImage | null>;
+  openImageAt(imagePath: string): Promise<LoadedImage | null>;
   saveEdits(imagePath: string, edits: ImageEdits): Promise<boolean>;
+  recordPhoto(imagePath: string, name: string, thumbnail: string | null): Promise<boolean>;
+  recentPhotos(): Promise<LibraryEntry[]>;
   saveImage(data: ArrayBuffer, defaultName: string): Promise<boolean>;
   modelStatus(): Promise<ModelStatus>;
   upscaleImage(image: RawImage): Promise<RawImage>;

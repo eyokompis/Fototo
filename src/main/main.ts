@@ -4,6 +4,7 @@ import path from 'node:path';
 import { downloadModel, isModelDownloaded, REAL_ESRGAN_X4, upscaleImage } from './upscaler';
 import { enhanceLowLight } from './enhancer';
 import { loadEdits, saveEdits, type ImageEdits } from './edits';
+import { recentPhotos, recordPhoto } from './library';
 
 const isDev = !app.isPackaged;
 
@@ -54,6 +55,28 @@ ipcMain.handle('save-edits', async (_event, imagePath: string, edits: ImageEdits
   await saveEdits(imagePath, edits);
   return true;
 });
+
+ipcMain.handle('open-image-at', async (_event, imagePath: string) => {
+  try {
+    const data = await fs.readFile(imagePath);
+    const edits = await loadEdits(imagePath);
+    return {
+      name: path.basename(imagePath),
+      path: imagePath,
+      data: data.buffer.slice(data.byteOffset, data.byteOffset + data.byteLength),
+      edits,
+    };
+  } catch {
+    return null;
+  }
+});
+
+ipcMain.handle('library:record', async (_event, imagePath: string, name: string, thumbnail: string | null) => {
+  await recordPhoto(imagePath, name, thumbnail);
+  return true;
+});
+
+ipcMain.handle('library:recent', async () => recentPhotos());
 
 ipcMain.handle('ai:model-status', async () => ({
   label: REAL_ESRGAN_X4.label,

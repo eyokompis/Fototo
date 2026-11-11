@@ -1,5 +1,5 @@
 import { DEFAULT_ADJUSTMENTS, ImageProcessor, type Adjustments } from './processor';
-import type { RawImage } from './api';
+import type { LoadedImage, RawImage } from './api';
 import './api';
 import './style.css';
 
@@ -13,6 +13,8 @@ const upscaleBtn = document.getElementById('upscale-btn') as HTMLButtonElement;
 const enhanceBtn = document.getElementById('enhance-btn') as HTMLButtonElement;
 const statusEl = document.getElementById('status') as HTMLSpanElement;
 const fileNameEl = document.getElementById('file-name') as HTMLSpanElement;
+const recentsGrid = document.getElementById('recents-grid') as HTMLDivElement;
+const recentsSection = document.getElementById('recents') as HTMLDivElement;
 
 const sliders: Record<keyof Adjustments, HTMLInputElement> = {
   exposure: document.getElementById('exposure') as HTMLInputElement,
@@ -62,8 +64,22 @@ function resetAdjustments(): void {
 async function loadImage(): Promise<void> {
   const result = await window.fototo.openImage();
   if (!result) return;
+  await applyLoadedImage(result);
+}
+
+async function openRecent(imagePath: string): Promise<void> {
+  const result = await window.fototo.openImageAt(imagePath);
+  if (!result) {
+    setStatus('Could not open photo (file missing?)');
+    return;
+  }
+  await applyLoadedImage(result);
+}
+
+async function applyLoadedImage(result: LoadedImage): Promise<void> {
   bitmap = await createImageBitmap(new Blob([result.data]));
   currentName = result.name;
+  currentPath = result.path;
   fileNameEl.textContent = result.name;
   if (!processor) processor = new ImageProcessor(canvas);
   processor.setImage(bitmap);
@@ -82,7 +98,63 @@ async function loadImage(): Promise<void> {
   } else {
     resetAdjustments();
   }
-  currentPath = result.path;
+  recordThumbnail();
+}
+
+async function recordThumbnail(): Promise<void> {
+  if (!bitmap || !currentPath) return;
+  try {
+    const maxDim = 160;
+    const scale = Math.min(1, maxDim / Math.max(bitmap.width, bitmap.height));
+    const thumbCanvas = new OffscreenCanvas(
+      Math.max(1, Math.round(bitmap.width * scale)),
+      Math.max(1, Math.round(bitmap.height * scale)),
+    );
+    const ctx = thumbCanvas.getContext('2d');
+    if (!ctx) return;
+    ctx.drawImage(bitmap, 0, 0, thumbCanvas.width, thumbCanvas.height);
+    const blob = await thumbCanvas.convertToBlob({ type: 'image/jpeg', quality: 0.7 });
+    const dataUrl = await new Promise<string>((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result as string);
+      reader.onerror = () => reject(reader.error);
+      reader.readAsDataURL(blob);
+    });
+    await window.fototo.recordPhoto(currentPath, currentName, dataUrl);
+  } catch {
+    void 0;
+  }
+  loadRecents();
+}
+
+async function loadRecents(): Promise<void> {
+  try {
+    const entries = await window.fototo.recentPhotos();
+    recentsSection.hidden = entries.length === 0;
+    recentsGrid.replaceChildren();
+    for (const entry of entries) {
+      const item = document.createElement('button');
+      item.className = 'recent-item';
+      item.title = entry.name;
+      if (entry.thumbnail) {
+        const img = document.createElement('img');
+        img.src = entry.thumbnail;
+        img.alt = entry.name;
+        item.appendChild(img);
+      } else {
+        const placeholder = document.createElement('span');
+        placeholder.textContent = '🖼';
+        item.appendChild(placeholder);
+      }
+      const label = document.createElement('span');
+      label.textContent = entry.name;
+      item.appendChild(label);
+      item.addEventListener('click', () => openRecent(entry.path));
+      recentsGrid.appendChild(item);
+    }
+  } catch {
+    void 0;
+  }
 }
 
 function extractPixels(): RawImage | null {
@@ -188,6 +260,8 @@ window.fototo
       : `Upscale 4× with ${status.label} (model downloads on first use)`;
   })
   .catch(() => undefined);
+
+loadRecents();
 
 window.addEventListener('dragover', (e) => e.preventDefault());
 window.addEventListener('drop', (e) => {
