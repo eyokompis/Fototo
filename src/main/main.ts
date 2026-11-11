@@ -76,7 +76,25 @@ ipcMain.handle('library:record', async (_event, imagePath: string, name: string,
   return true;
 });
 
-ipcMain.handle('library:recent', async () => recentPhotos());
+ipcMain.handle('library:recent', async (_event, limit?: number) => recentPhotos(limit));
+
+ipcMain.handle('library:import-folder', async () => {
+  const result = await dialog.showOpenDialog({
+    title: 'Add folder to gallery',
+    properties: ['openDirectory'],
+  });
+  if (result.canceled || result.filePaths.length === 0) return 0;
+  const dir = result.filePaths[0];
+  const exts = new Set(['.png', '.jpg', '.jpeg', '.webp', '.gif', '.bmp', '.avif']);
+  const entries = await fs.readdir(dir, { withFileTypes: true });
+  let count = 0;
+  for (const entry of entries) {
+    if (!entry.isFile() || !exts.has(path.extname(entry.name).toLowerCase())) continue;
+    await recordPhoto(path.join(dir, entry.name), entry.name, null);
+    count += 1;
+  }
+  return count;
+});
 
 ipcMain.handle('ai:model-status', async () => ({
   label: REAL_ESRGAN_X4.label,

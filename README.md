@@ -65,6 +65,8 @@ Note: the macOS build is unsigned, so macOS may show an "unidentified developer"
 - [x] Sidecar edit metadata (non-destructive edits)
 - [x] Photo library with SQLite index (recent photos with thumbnails on the start screen)
 - [x] Packaging with electron-builder (NSIS / DMG / AppImage) and custom app icon
+- [x] Theme switcher (system / light / dark) and in-app help
+- [x] Gallery view with folder import, plus 90° rotation and crop
 
 ## Non-destructive edits
 
