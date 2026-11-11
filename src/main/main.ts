@@ -3,6 +3,7 @@ import { promises as fs } from 'node:fs';
 import path from 'node:path';
 import { downloadModel, isModelDownloaded, REAL_ESRGAN_X4, upscaleImage } from './upscaler';
 import { enhanceLowLight } from './enhancer';
+import { loadEdits, saveEdits, type ImageEdits } from './edits';
 
 const isDev = !app.isPackaged;
 
@@ -40,7 +41,18 @@ ipcMain.handle('open-image', async () => {
   if (result.canceled || result.filePaths.length === 0) return null;
   const filePath = result.filePaths[0];
   const data = await fs.readFile(filePath);
-  return { name: path.basename(filePath), data: data.buffer.slice(data.byteOffset, data.byteOffset + data.byteLength) };
+  const edits = await loadEdits(filePath);
+  return {
+    name: path.basename(filePath),
+    path: filePath,
+    data: data.buffer.slice(data.byteOffset, data.byteOffset + data.byteLength),
+    edits,
+  };
+});
+
+ipcMain.handle('save-edits', async (_event, imagePath: string, edits: ImageEdits) => {
+  await saveEdits(imagePath, edits);
+  return true;
 });
 
 ipcMain.handle('ai:model-status', async () => ({

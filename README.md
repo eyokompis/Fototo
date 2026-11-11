@@ -37,5 +37,9 @@ In one terminal run `npm run dev`, and in a second terminal `npx electron .` for
 - [x] WebGL2 adjustment pipeline (exposure, contrast, saturation, temperature)
 - [x] AI upscaling via ONNX Runtime (Real-ESRGAN x4, tiled, model downloaded on first use)
 - [x] Low-light enhancement via ONNX Runtime (Zero-DCE, bundled model)
-- [ ] Sidecar edit metadata (non-destructive edits)
+- [x] Sidecar edit metadata (non-destructive edits)
 - [ ] Photo library with SQLite index
+
+## Non-destructive edits
+
+Adjustments are saved automatically to a sidecar file next to the photo (`photo.jpg` → `photo.jpg.fototo.json`). Reopening the photo restores them; the original file is never modified. Delete the sidecar file to start fresh.
