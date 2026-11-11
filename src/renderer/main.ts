@@ -9,7 +9,11 @@ const controls = document.getElementById('controls') as HTMLDivElement;
 const openBtn = document.getElementById('open-btn') as HTMLButtonElement;
 const saveBtn = document.getElementById('save-btn') as HTMLButtonElement;
 const resetBtn = document.getElementById('reset-btn') as HTMLButtonElement;
-const upscaleBtn = document.getElementById('upscale-btn') as HTMLButtonElement;
+const up2Btn = document.getElementById('up2-btn') as HTMLButtonElement;
+const up4Btn = document.getElementById('up4-btn') as HTMLButtonElement;
+const res2kBtn = document.getElementById('res-2k') as HTMLButtonElement;
+const res4kBtn = document.getElementById('res-4k') as HTMLButtonElement;
+const res8kBtn = document.getElementById('res-8k') as HTMLButtonElement;
 const enhanceBtn = document.getElementById('enhance-btn') as HTMLButtonElement;
 const statusEl = document.getElementById('status') as HTMLSpanElement;
 const fileNameEl = document.getElementById('file-name') as HTMLSpanElement;
@@ -161,7 +165,6 @@ async function applyLoadedImage(result: LoadedImage): Promise<void> {
   controls.hidden = false;
   saveBtn.disabled = false;
   resetBtn.disabled = false;
-  upscaleBtn.disabled = false;
   enhanceBtn.disabled = false;
   if (result.edits) {
     adjustments = { ...result.edits };
@@ -239,12 +242,57 @@ function extractPixels(source: ImageBitmap): RawImage | null {
   return { data: pixels.data.buffer as ArrayBuffer, width: source.width, height: source.height };
 }
 
-async function applyResult(result: RawImage): Promise<void> {
-  const imageData = new ImageData(new Uint8ClampedArray(result.data), result.width, result.height);
-  bitmap = await createImageBitmap(imageData);
+async function applyBitmap(bm: ImageBitmap): Promise<void> {
+  bitmap = bm;
   processor?.setImage(bitmap);
+  applyZoom();
   resetAdjustments();
   scheduleSave();
+}
+
+async function applyResult(result: RawImage): Promise<void> {
+  await applyBitmap(await createImageBitmap(new ImageData(new Uint8ClampedArray(result.data), result.width, result.height)));
+}
+
+async function resizeBitmap(source: ImageBitmap, w: number, h: number): Promise<ImageBitmap> {
+  const offscreen = new OffscreenCanvas(w, h);
+  const ctx = offscreen.getContext('2d');
+  if (!ctx) return source;
+  ctx.imageSmoothingEnabled = true;
+  ctx.imageSmoothingQuality = 'high';
+  ctx.drawImage(source, 0, 0, w, h);
+  return createImageBitmap(offscreen);
+}
+
+async function runUpscaleOption(button: HTMLButtonElement, option: number): Promise<void> {
+  await runAiAction(button, async () => {
+    if (!bitmap) return;
+    const image = extractPixels(bitmap);
+    if (!image) return;
+    const long = Math.max(bitmap.width, bitmap.height);
+    let targetLong: number;
+    let capped = false;
+    if (option <= 8) {
+      targetLong = long * option;
+    } else {
+      if (option / long <= 1.05) {
+        setStatus(`Photo is already ${long}px on its long side — nothing to do`);
+        return;
+      }
+      targetLong = Math.round(Math.min(option, long * 4));
+      capped = targetLong < option;
+    }
+    const s = targetLong / long;
+    const targetW = Math.max(1, Math.round(bitmap.width * s));
+    const targetH = Math.max(1, Math.round(bitmap.height * s));
+    const result = await runUpscale(image, currentName);
+    let out = await createImageBitmap(new ImageData(new Uint8ClampedArray(result.data), result.width, result.height));
+    if (out.width !== targetW || out.height !== targetH) {
+      out = await resizeBitmap(out, targetW, targetH);
+    }
+    await applyBitmap(out);
+    finishProgress(`Upscaled to ${bitmap.width}×${bitmap.height}${capped ? ' (max 4×)' : ''}`);
+  });
 }
 
 async function runAiAction(button: HTMLButtonElement, run: () => Promise<void>): Promise<void> {
@@ -278,17 +326,6 @@ async function runUpscale(image: RawImage, label: string): Promise<RawImage> {
   } finally {
     unsubscribe();
   }
-}
-
-async function upscale(): Promise<void> {
-  await runAiAction(upscaleBtn, async () => {
-    if (!bitmap) return;
-    const image = extractPixels(bitmap);
-    if (!image) return;
-    const result = await runUpscale(image, currentName);
-    await applyResult(result);
-    finishProgress(`Upscaled to ${result.width}×${result.height}`);
-  });
 }
 
 async function enhance(): Promise<void> {
@@ -656,7 +693,11 @@ helpDialog.addEventListener('click', (e) => {
 });
 
 openBtn.addEventListener('click', loadImage);
-upscaleBtn.addEventListener('click', upscale);
+up2Btn.addEventListener('click', () => void runUpscaleOption(up2Btn, 2));
+up4Btn.addEventListener('click', () => void runUpscaleOption(up4Btn, 4));
+res2kBtn.addEventListener('click', () => void runUpscaleOption(res2kBtn, 2560));
+res4kBtn.addEventListener('click', () => void runUpscaleOption(res4kBtn, 3840));
+res8kBtn.addEventListener('click', () => void runUpscaleOption(res8kBtn, 7680));
 enhanceBtn.addEventListener('click', enhance);
 
 saveBtn.addEventListener('click', saveImage);
@@ -677,9 +718,10 @@ for (const key of Object.keys(sliders) as (keyof Adjustments)[]) {
 window.fototo
   .modelStatus()
   .then((status) => {
-    upscaleBtn.title = status.downloaded
-      ? `Upscale 4× with ${status.label}`
-      : `Upscale 4× with ${status.label} (model downloads on first use)`;
+    const title = status.downloaded
+      ? `Upscale with ${status.label}`
+      : `Upscale with ${status.label} (model downloads on first use)`;
+    for (const btn of [up2Btn, up4Btn, res2kBtn, res4kBtn, res8kBtn]) btn.title = title;
   })
   .catch(() => undefined);
 

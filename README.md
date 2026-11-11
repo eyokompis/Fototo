@@ -75,6 +75,7 @@ Note: the macOS build is unsigned, so macOS may show an "unidentified developer"
 - [x] Gallery view with folder import, plus 90° rotation and crop
 - [x] Batch processing (select photos in the gallery, upscale or enhance them all into an output folder)
 - [x] Auto-updates on Windows and Linux (macOS needs a signed build, so it updates by reinstalling)
+- [x] Upscale options: 2×, 4×, or reach a target resolution (2K / 4K / 8K, capped at the model's 4×)
 
 ## Non-destructive edits
 

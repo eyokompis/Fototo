@@ -170,6 +170,12 @@ main {
   gap: 8px;
 }
 
+.section-label {
+  font-size: 12px;
+  color: var(--muted);
+  margin-bottom: -12px;
+}
+
 .transform-row button {
   flex: 1;
   padding: 6px 8px;
