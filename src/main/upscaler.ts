@@ -146,17 +146,18 @@ export async function upscaleImage(
   const outHeight = height * scale;
   const out = new Uint8ClampedArray(outWidth * outHeight * 4);
 
-  const cols = Math.ceil(width / tileSize);
-  const rows = Math.ceil(height / tileSize);
+  const valid = tileSize - 2 * pad;
+  const cols = Math.ceil(width / valid);
+  const rows = Math.ceil(height / valid);
   const total = cols * rows;
   let done = 0;
 
   for (let row = 0; row < rows; row++) {
     for (let col = 0; col < cols; col++) {
-      const tx = col * tileSize;
-      const ty = row * tileSize;
-      const tw = Math.min(tileSize, width - tx);
-      const th = Math.min(tileSize, height - ty);
+      const tx = col * valid;
+      const ty = row * valid;
+      const tw = Math.min(valid, width - tx);
+      const th = Math.min(valid, height - ty);
       const x0 = Math.max(0, tx - pad);
       const y0 = Math.max(0, ty - pad);
       const x1 = Math.min(width, tx + tw + pad);
@@ -170,14 +171,16 @@ export async function upscaleImage(
       const plane = oh * ow;
 
       for (let y = 0; y < th * scale; y++) {
-        const oy = y0 * scale + (ty - y0) * scale + y;
+        const oy = ty * scale + y;
+        const srcRow = (ty - y0) * scale + y;
         for (let x = 0; x < tw * scale; x++) {
-          const ox = x0 * scale + (tx - x0) * scale + x;
+          const ox = tx * scale + x;
+          const srcCol = (tx - x0) * scale + x;
           const oi = (oy * outWidth + ox) * 4;
-          const idx = y * ow + x;
-          out[oi] = od[idx];
-          out[oi + 1] = od[plane + idx];
-          out[oi + 2] = od[2 * plane + idx];
+          const idx = srcRow * ow + srcCol;
+          out[oi] = od[idx] * 255;
+          out[oi + 1] = od[plane + idx] * 255;
+          out[oi + 2] = od[2 * plane + idx] * 255;
           out[oi + 3] = 255;
         }
       }
