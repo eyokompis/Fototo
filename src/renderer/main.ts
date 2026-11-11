@@ -21,6 +21,12 @@ const galleryCloseBtn = document.getElementById('gallery-close') as HTMLButtonEl
 const galleryGrid = document.getElementById('gallery-grid') as HTMLDivElement;
 const galleryEmpty = document.getElementById('gallery-empty') as HTMLParagraphElement;
 const importFolderBtn = document.getElementById('import-folder-btn') as HTMLButtonElement;
+const gallerySelectBtn = document.getElementById('gallery-select-btn') as HTMLButtonElement;
+const batchBar = document.getElementById('batch-bar') as HTMLDivElement;
+const batchCount = document.getElementById('batch-count') as HTMLSpanElement;
+const batchUpscaleBtn = document.getElementById('batch-upscale') as HTMLButtonElement;
+const batchEnhanceBtn = document.getElementById('batch-enhance') as HTMLButtonElement;
+const batchDoneBtn = document.getElementById('batch-done') as HTMLButtonElement;
 const rotateCcwBtn = document.getElementById('rotate-ccw') as HTMLButtonElement;
 const rotateCwBtn = document.getElementById('rotate-cw') as HTMLButtonElement;
 const cropBtn = document.getElementById('crop-btn') as HTMLButtonElement;
@@ -53,6 +59,9 @@ let saveTimer: ReturnType<typeof setTimeout> | null = null;
 let cropping = false;
 let cropDragging = false;
 let cropOrigin: { x: number; y: number } | null = null;
+let selecting = false;
+let batchBusy = false;
+const selectedPaths = new Set<string>();
 
 function setStatus(text: string): void {
   statusEl.textContent = text;
@@ -181,14 +190,13 @@ async function loadRecents(): Promise<void> {
   }
 }
 
-function extractPixels(): RawImage | null {
-  if (!bitmap) return null;
-  const offscreen = new OffscreenCanvas(bitmap.width, bitmap.height);
+function extractPixels(source: ImageBitmap): RawImage | null {
+  const offscreen = new OffscreenCanvas(source.width, source.height);
   const ctx = offscreen.getContext('2d', { willReadFrequently: true });
   if (!ctx) return null;
-  ctx.drawImage(bitmap, 0, 0);
-  const pixels = ctx.getImageData(0, 0, bitmap.width, bitmap.height);
-  return { data: pixels.data.buffer as ArrayBuffer, width: bitmap.width, height: bitmap.height };
+  ctx.drawImage(source, 0, 0);
+  const pixels = ctx.getImageData(0, 0, source.width, source.height);
+  return { data: pixels.data.buffer as ArrayBuffer, width: source.width, height: source.height };
 }
 
 async function applyResult(result: RawImage): Promise<void> {
@@ -215,30 +223,35 @@ async function runAiAction(button: HTMLButtonElement, run: () => Promise<void>):
   }
 }
 
+async function runUpscale(image: RawImage): Promise<RawImage> {
+  const status = await window.fototo.modelStatus();
+  setStatus(status.downloaded ? 'Upscaling…' : 'Downloading AI model (first run)…');
+  const unsubscribe = window.fototo.onProgress(({ stage, done, total }) => {
+    if (stage === 'download') setStatus(`Downloading model ${done}/${total}…`);
+    else setStatus(`Upscaling tile ${done}/${total}…`);
+  });
+  try {
+    return await window.fototo.upscaleImage(image);
+  } finally {
+    unsubscribe();
+  }
+}
+
 async function upscale(): Promise<void> {
   await runAiAction(upscaleBtn, async () => {
-    const image = extractPixels();
+    if (!bitmap) return;
+    const image = extractPixels(bitmap);
     if (!image) return;
-    const status = await window.fototo.modelStatus();
-    setStatus(status.downloaded ? 'Upscaling…' : 'Downloading AI model (first run)…');
-
-    const unsubscribe = window.fototo.onProgress(({ stage, done, total }) => {
-      if (stage === 'download') setStatus(`Downloading model ${done}/${total}…`);
-      else setStatus(`Upscaling tile ${done}/${total}…`);
-    });
-    try {
-      const result = await window.fototo.upscaleImage(image);
-      await applyResult(result);
-      setStatus(`Upscaled to ${result.width}×${result.height}`);
-    } finally {
-      unsubscribe();
-    }
+    const result = await runUpscale(image);
+    await applyResult(result);
+    setStatus(`Upscaled to ${result.width}×${result.height}`);
   });
 }
 
 async function enhance(): Promise<void> {
   await runAiAction(enhanceBtn, async () => {
-    const image = extractPixels();
+    if (!bitmap) return;
+    const image = extractPixels(bitmap);
     if (!image) return;
     setStatus('Enhancing light…');
     const result = await window.fototo.enhanceImage(image);
@@ -363,6 +376,17 @@ async function loadGallery(): Promise<void> {
       label.textContent = entry.name;
       item.appendChild(label);
       item.addEventListener('click', () => {
+        if (selecting) {
+          if (selectedPaths.has(entry.path)) {
+            selectedPaths.delete(entry.path);
+            item.classList.remove('selected');
+          } else {
+            selectedPaths.add(entry.path);
+            item.classList.add('selected');
+          }
+          updateBatchBar();
+          return;
+        }
         galleryDialog.close();
         void openRecent(entry.path);
       });
@@ -371,6 +395,67 @@ async function loadGallery(): Promise<void> {
   } catch {
     void 0;
   }
+}
+
+function updateBatchBar(): void {
+  batchCount.textContent = `${selectedPaths.size} selected`;
+  const disabled = !selecting || batchBusy || selectedPaths.size === 0;
+  batchUpscaleBtn.disabled = disabled;
+  batchEnhanceBtn.disabled = disabled;
+  batchDoneBtn.disabled = batchBusy;
+}
+
+function setSelectMode(on: boolean): void {
+  selecting = on;
+  selectedPaths.clear();
+  batchBar.hidden = !on;
+  gallerySelectBtn.textContent = on ? 'Stop selecting' : 'Select';
+  updateBatchBar();
+  void loadGallery();
+}
+
+async function encodePng(result: RawImage): Promise<ArrayBuffer | null> {
+  const offscreen = new OffscreenCanvas(result.width, result.height);
+  const ctx = offscreen.getContext('2d');
+  if (!ctx) return null;
+  ctx.putImageData(new ImageData(new Uint8ClampedArray(result.data), result.width, result.height), 0, 0);
+  const blob = await offscreen.convertToBlob({ type: 'image/png' });
+  return blob.arrayBuffer();
+}
+
+async function runBatch(op: 'upscale' | 'enhance'): Promise<void> {
+  if (batchBusy || selectedPaths.size === 0) return;
+  const outputDir = await window.fototo.chooseDirectory();
+  if (!outputDir) return;
+  batchBusy = true;
+  updateBatchBar();
+  const paths = [...selectedPaths];
+  let done = 0;
+  let failed = 0;
+  for (let i = 0; i < paths.length; i++) {
+    const photoPath = paths[i];
+    const name = photoPath.split(/[\\/]/).pop() ?? photoPath;
+    setStatus(`Batch ${i + 1}/${paths.length}: ${name}`);
+    try {
+      const loaded = await window.fototo.openImageAt(photoPath);
+      if (!loaded) throw new Error('unreadable');
+      const source = await createImageBitmap(new Blob([loaded.data]));
+      const image = extractPixels(source);
+      if (!image) throw new Error('decode failed');
+      const result = op === 'upscale' ? await runUpscale(image) : await window.fototo.enhanceImage(image);
+      const data = await encodePng(result);
+      if (!data) throw new Error('encode failed');
+      const dot = loaded.name.lastIndexOf('.');
+      const base = dot > 0 ? loaded.name.slice(0, dot) : loaded.name;
+      await window.fototo.saveImageTo(data, outputDir, `${base}-fototo.png`);
+      done += 1;
+    } catch {
+      failed += 1;
+    }
+  }
+  batchBusy = false;
+  setStatus(`Batch complete: ${done} saved${failed > 0 ? `, ${failed} failed` : ''}`);
+  setSelectMode(false);
 }
 
 async function saveImage(): Promise<void> {
@@ -399,10 +484,21 @@ galleryBtn.addEventListener('click', () => {
   galleryDialog.showModal();
   void loadGallery();
 });
-galleryCloseBtn.addEventListener('click', () => galleryDialog.close());
-galleryDialog.addEventListener('click', (e) => {
-  if (e.target === galleryDialog) galleryDialog.close();
+galleryCloseBtn.addEventListener('click', () => {
+  if (!batchBusy) setSelectMode(false);
+  galleryDialog.close();
 });
+galleryDialog.addEventListener('click', (e) => {
+  if (e.target === galleryDialog && !batchBusy) {
+    setSelectMode(false);
+    galleryDialog.close();
+  }
+});
+gallerySelectBtn.addEventListener('click', () => setSelectMode(!selecting));
+batchDoneBtn.addEventListener('click', () => setSelectMode(false));
+batchUpscaleBtn.addEventListener('click', () => void runBatch('upscale'));
+batchEnhanceBtn.addEventListener('click', () => void runBatch('enhance'));
+
 importFolderBtn.addEventListener('click', async () => {
   importFolderBtn.disabled = true;
   try {
