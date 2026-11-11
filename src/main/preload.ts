@@ -7,10 +7,21 @@ contextBridge.exposeInMainWorld('fototo', {
     data: ArrayBuffer;
     edits: { exposure: number; contrast: number; saturation: number; temperature: number } | null;
   } | null> => ipcRenderer.invoke('open-image'),
+  openImageAt: (imagePath: string): Promise<{
+    name: string;
+    path: string;
+    data: ArrayBuffer;
+    edits: { exposure: number; contrast: number; saturation: number; temperature: number } | null;
+  } | null> => ipcRenderer.invoke('open-image-at', imagePath),
   saveEdits: (
     imagePath: string,
     edits: { exposure: number; contrast: number; saturation: number; temperature: number },
   ): Promise<boolean> => ipcRenderer.invoke('save-edits', imagePath, edits),
+  recordPhoto: (imagePath: string, name: string, thumbnail: string | null): Promise<boolean> =>
+    ipcRenderer.invoke('library:record', imagePath, name, thumbnail),
+  recentPhotos: (): Promise<
+    { path: string; name: string; thumbnail: string | null; openedAt: number }[]
+  > => ipcRenderer.invoke('library:recent'),
   saveImage: (data: ArrayBuffer, defaultName: string): Promise<boolean> =>
     ipcRenderer.invoke('save-image', data, defaultName),
   modelStatus: (): Promise<{ label: string; downloaded: boolean }> =>
