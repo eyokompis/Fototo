@@ -1,0 +1,22 @@
+{
+  "name": "fototo",
+  "productName": "fototo",
+  "version": "0.1.0",
+  "description": "Enhance the quality, light and upscale your photos, locally or with AI.",
+  "license": "MIT",
+  "private": true,
+  "main": "dist-electron/main.js",
+  "scripts": {
+    "dev": "vite",
+    "typecheck": "tsc --noEmit && tsc -p tsconfig.node.json --noEmit",
+    "build:renderer": "vite build",
+    "build:main": "tsc -p tsconfig.node.json",
+    "build": "npm run build:renderer && npm run build:main",
+    "start": "npm run build && electron ."
+  },
+  "devDependencies": {
+    "electron": "^33.0.0",
+    "typescript": "^5.6.0",
+    "vite": "^6.0.0"
+  }
+}
