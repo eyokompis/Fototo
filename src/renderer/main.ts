@@ -74,6 +74,7 @@ let currentPhotoId: string | null = null;
 let adjustments: Adjustments = { ...DEFAULT_ADJUSTMENTS };
 let busy = false;
 let saveTimer: ReturnType<typeof setTimeout> | null = null;
+let pendingSave: { photoId: string; edits: Adjustments } | null = null;
 let zoom: number | null = null;
 let originalBitmap: ImageBitmap | null = null;
 let sourceBytes: ArrayBuffer | null = null;
@@ -132,12 +133,23 @@ function finishProgress(message: string): void {
   }, 1500);
 }
 
+function flushScheduledSave(): void {
+  if (saveTimer) clearTimeout(saveTimer);
+  saveTimer = null;
+  const pending = pendingSave;
+  pendingSave = null;
+  if (pending) window.fototo.saveEdits(pending.photoId, pending.edits).catch(() => undefined);
+}
+
 function scheduleSave(): void {
   if (!currentPhotoId) return;
   if (saveTimer) clearTimeout(saveTimer);
+  pendingSave = { photoId: currentPhotoId, edits: { ...adjustments } };
   saveTimer = setTimeout(() => {
     saveTimer = null;
-    window.fototo.saveEdits(currentPhotoId!, adjustments).catch(() => undefined);
+    const pending = pendingSave;
+    pendingSave = null;
+    if (pending) window.fototo.saveEdits(pending.photoId, pending.edits).catch(() => undefined);
   }, 400);
 }
 
@@ -215,13 +227,16 @@ async function redo(): Promise<void> {
 }
 
 async function loadImage(): Promise<void> {
+  if (busy) return;
   const result = await window.fototo.openImage();
-  if (!result) return;
+  if (!result || busy) return;
   await applyLoadedImage(result);
 }
 
 async function openRecent(photoId: string): Promise<void> {
+  if (busy) return;
   const result = await window.fototo.openImageAt(photoId);
+  if (busy) return;
   if (!result) {
     setStatus('Could not open photo (file missing?)');
     return;
@@ -240,6 +255,7 @@ async function applyLoadedImage(result: LoadedImage): Promise<void> {
   straightenInput.value = '0';
   canvas.style.transform = '';
   applyZoom();
+  flushScheduledSave();
   currentName = result.name;
   currentPhotoId = result.id;
   fileNameEl.textContent = result.name;
@@ -387,6 +403,8 @@ async function runAiAction(button: HTMLButtonElement, run: () => Promise<void>):
   if (!processor || !bitmap || busy) return;
   busy = true;
   button.disabled = true;
+  openBtn.disabled = true;
+  galleryBtn.disabled = true;
   saveBtn.disabled = true;
   try {
     await run();
@@ -396,6 +414,8 @@ async function runAiAction(button: HTMLButtonElement, run: () => Promise<void>):
   } finally {
     busy = false;
     button.disabled = false;
+    openBtn.disabled = false;
+    galleryBtn.disabled = false;
     saveBtn.disabled = false;
   }
 }
