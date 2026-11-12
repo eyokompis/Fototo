@@ -34,7 +34,7 @@ jobs:
       APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
     steps:
       - name: Check out trusted workflow source
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
           ref: main
           fetch-depth: 0
@@ -66,7 +66,7 @@ jobs:
           VERSION="${TAG_NAME#v}"
           npm version "$VERSION" --no-git-tag-version --allow-same-version
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
         with:
           node-version: 22
           cache: npm
@@ -75,7 +75,7 @@ jobs:
       - run: npm run dist -- --publish never
 
       - name: Upload platform build artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
           name: release-${{ matrix.os }}
           path: |
@@ -104,12 +104,12 @@ jobs:
           fi
 
       - name: Download platform artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
         with:
           path: release-assets
 
       - name: Create draft release for manual review
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@3bb12739c298aeb8a4eeaf626c5b8d85266b0e65
         with:
           tag_name: ${{ inputs.tag_name }}
           name: ${{ inputs.tag_name }}
