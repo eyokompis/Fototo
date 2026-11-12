@@ -1,6 +1,6 @@
 # Security Threat Model and Safe IPC Contract
 
-**Status:** Review baseline and target contract  
+**Status:** P0 implementation in progress on this branch; remaining P1/P2 controls are not yet implemented  
 **Scope:** Electron main process, preload bridge, renderer, local files, local AI inference, model downloads, and application updates.  
 **Branch:** `architecture/fototo-next`
 
@@ -61,14 +61,14 @@ Severity describes the risk if the relevant input or execution path is reachable
 
 | Priority | Finding | Evidence / impact |
 |---|---|---|
-| High | Renderer-controlled arbitrary path read | `open-image-at` accepts an arbitrary `imagePath` and passes it to `fs.readFile`; it also reads the adjacent edit sidecar. The gallery currently supplies paths, but the IPC handler itself does not enforce that relationship. |
-| High | Renderer-controlled arbitrary sidecar write | `save-edits` accepts `imagePath` and writes `${imagePath}.fototo.json` without validating the path or proving that the app granted access to it. |
-| High | Export path traversal / destination escape | `save-image-to` accepts both `dirPath` and `fileName` from the renderer and writes `path.join(dirPath, name)`. No basename or containment check is visible. A crafted filename containing traversal components can escape the intended folder. |
-| High | IPC handlers lack visible sender validation | The filesystem and AI handlers do not check `event.senderFrame`, the expected main frame, or the expected application origin before performing privileged work. |
-| Medium | AI payload shape and byte length are not validated at the IPC boundary | Handlers construct `Uint8ClampedArray` directly from renderer-supplied data and trust width/height. The processing modules have pixel caps, but the IPC boundary does not verify safe integers, positive dimensions, exact RGBA byte length, or an independent input byte limit. |
+| High | Renderer-controlled arbitrary path read | **Mitigated in this branch:** `open-image-at` accepts only a random main-process photo ID created by a native open dialog, an authorized drop, or a main-process gallery lookup. The renderer no longer receives or supplies the source path. Runtime integration testing remains outstanding. |
+| High | Renderer-controlled arbitrary sidecar write | **Mitigated in this branch:** `save-edits` resolves a main-owned photo ID and validates the complete edit object and numeric ranges before writing the sidecar. |
+| High | Export path traversal / destination escape | **Mitigated in this branch:** the renderer receives an opaque destination token from the native folder dialog; export names must be safe basenames with PNG/JPEG extensions, and files are created exclusively (`wx`) with collision-safe suffixes. |
+| High | IPC handlers lack visible sender validation | **Mitigated in this branch:** every registered invoke handler checks the main frame and the configured Vite origin or packaged app document before doing privileged work. |
+| Medium | AI payload shape and byte length are not validated at the IPC boundary | **Mitigated in this branch:** AI IPC validates ArrayBuffer type, positive safe-integer dimensions, exact RGBA byte length, and a 25-megapixel input cap before constructing typed arrays. |
 | Medium | No Content Security Policy is present in the inspected `index.html` | There is no CSP meta policy in the document. A policy must be designed for both Vite development and packaged `file://` loading, then tested in both modes. |
 | Medium | Navigation and new-window restrictions are not visible | The inspected window setup does not register `will-navigate` or `setWindowOpenHandler` policies. |
-| Medium | Gallery limit is not validated | `library:recent` forwards the renderer-supplied limit to SQL.js. Validate and clamp it to a small positive integer range. |
+| Medium | Gallery limit is not validated | **Mitigated in this branch:** gallery limits are normalized to the range 1–2,000, with a default of 60. |
 | Medium | Model downloads are not visibly integrity-pinned or size-bounded | Model URLs point at Hugging Face `resolve/main`; the code streams files to disk without an expected digest or maximum byte count. A moving branch is not a stable artifact identity. |
 | Medium | Update download/install is automatic | Packaged builds enable `autoDownload` and `autoInstallOnAppQuit`. Review the configured update feed, signing verification, release process, and whether users should be able to defer installation. |
 
@@ -79,6 +79,19 @@ Severity describes the risk if the relevant input or execution path is reachable
 - File and image decoding may allow excessive memory or CPU consumption before existing pixel caps are reached. The import path reads the complete file into memory; compressed file size and decoded dimensions need separate limits.
 - A compromised or malicious update/model source could affect users if artifact authenticity is not independently verified. No signature bypass or malicious artifact has been demonstrated.
 - CSP compatibility and the minimum safe policy are not yet verified against the complete renderer asset graph.
+
+## 4.1 P0 implementation status on `architecture/fototo-next`
+
+The following changes have been implemented on this branch and have not been merged into `main`:
+
+- `src/main/main.ts`: centralized sender/main-frame/origin validation on every invoke handler; main-process photo-ID and export-directory registries; file type/size checks; edit, thumbnail, AI payload and export validation; exclusive collision-safe batch export writes.
+- `src/main/preload.ts`: narrow bridge methods now pass opaque photo IDs and destination tokens instead of arbitrary source and destination paths. Drag-and-drop resolves a real dropped `File` through `webUtils` in preload.
+- `src/renderer/api.ts` and `src/renderer/main.ts`: updated gallery, recents, autosave, drag/drop and batch-export flows to use opaque references.
+- `src/main/security.ts`: shared runtime validation helpers.
+- `tests/security.test.cjs`: Node built-in regression tests for edit ranges, AI payload dimensions/byte lengths, export traversal, filenames, thumbnails and image types.
+- `package.json` and CI: `npm test` builds the main-process TypeScript and runs the security tests; CI now runs on `architecture/**` branches and skips the optional ONNX CUDA provider download because this project exercises the CPU provider in CI.
+
+**Verification:** GitHub Actions run 43136820521 completed the build job successfully: `npm ci`, `npm run typecheck`, `npm test`, and `npm run build` all passed. The packaging job was still running when this document was updated. This is not a substitute for runtime testing of the packaged Electron app, cross-platform filesystem behavior, or adversarial renderer integration tests.
 
 ## 5. Required safe IPC contract
 
