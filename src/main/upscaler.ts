@@ -64,23 +64,35 @@ function modelFilePath(model: ModelInfo, file: ModelFile): string {
 }
 
 export async function isModelDownloaded(model: ModelInfo): Promise<boolean> {
-  try {
-    await Promise.all(model.files.map((file) => isVerifiedModelFile(modelFilePath(model, file), file)));
-    return true;
-  } catch {
-    return false;
-  }
+  const results = await Promise.all(model.files.map((file) => isVerifiedModelFile(modelFilePath(model, file), file)));
+  return results.every(Boolean);
 }
 
+const activeDownloads = new Map<string, Promise<void>>();
+
 export async function downloadModel(model: ModelInfo, onProgress: (progress: UpscaleProgress) => void): Promise<void> {
-  await fs.mkdir(modelDir(model), { recursive: true });
-  let done = 0;
-  for (const file of model.files) {
+  const active = activeDownloads.get(model.id);
+  if (active) return active;
+
+  const task = (async () => {
+    await fs.mkdir(modelDir(model), { recursive: true });
+    let done = 0;
+    for (const file of model.files) {
+      onProgress({ stage: 'download', done, total: model.files.length });
+      if (!(await isVerifiedModelFile(modelFilePath(model, file), file))) {
+        await downloadVerifiedModelFile(file, modelFilePath(model, file));
+      }
+      done += 1;
+    }
     onProgress({ stage: 'download', done, total: model.files.length });
-    await downloadVerifiedModelFile(file, modelFilePath(model, file));
-    done += 1;
+  })();
+
+  activeDownloads.set(model.id, task);
+  try {
+    await task;
+  } finally {
+    if (activeDownloads.get(model.id) === task) activeDownloads.delete(model.id);
   }
-  onProgress({ stage: 'download', done, total: model.files.length });
 }
 
 async function getSession(model: ModelInfo): Promise<ort.InferenceSession> {
