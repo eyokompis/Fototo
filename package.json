@@ -85,7 +85,8 @@
         "!**/node_modules/onnxruntime-node/bin/napi-v6/linux/**",
         "!**/node_modules/onnxruntime-node/bin/napi-v6/win32/**"
       ],
-      "forceCodeSigning": true
+      "forceCodeSigning": true,
+      "notarize": true
     },
     "linux": {
       "target": "AppImage",
