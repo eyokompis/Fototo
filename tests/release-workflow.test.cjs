@@ -43,3 +43,11 @@ test('runtime does not poll or install unsigned automatic updates', () => {
   assert.doesNotMatch(main, /checkForUpdatesAndNotify/);
   assert.doesNotMatch(main, /autoInstallOnAppQuit/);
 });
+
+test('release workflow actions are pinned to immutable commit SHAs', () => {
+  const actionRefs = [...workflow.matchAll(/^\\s+uses: ([^\\s]+)$/gm)].map((match) => match[1]);
+  assert.ok(actionRefs.length > 0);
+  for (const actionRef of actionRefs) {
+    assert.match(actionRef, /@[0-9a-f]{40}$/, `Action is not pinned to a commit SHA: ${actionRef}`);
+  }
+});
