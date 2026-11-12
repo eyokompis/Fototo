@@ -91,7 +91,7 @@ The following changes have been implemented on this branch and have not been mer
 - `tests/security.test.cjs`: Node built-in regression tests for edit ranges, AI payload dimensions/byte lengths, export traversal, filenames, thumbnails and image types.
 - `package.json` and CI: `npm test` builds the main-process TypeScript and runs the security tests; CI now runs on `architecture/**` branches and skips the optional ONNX CUDA provider download because this project exercises the CPU provider in CI.
 
-**Verification:** GitHub Actions run 43136820521 completed the build job successfully: `npm ci`, `npm run typecheck`, `npm test`, and `npm run build` all passed. The packaging job was still running when this document was updated. This is not a substitute for runtime testing of the packaged Electron app, cross-platform filesystem behavior, or adversarial renderer integration tests.
+**Verification:** GitHub Actions run 43136833296 completed successfully: `npm ci`, `npm run typecheck`, `npm test`, `npm run build`, and `npm run dist:dir` all passed. This is not a substitute for runtime testing of the packaged Electron app, cross-platform filesystem behavior, or adversarial renderer integration tests.
 
 ## 5. Required safe IPC contract
 
