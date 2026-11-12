@@ -1,6 +1,6 @@
 # Security Threat Model and Safe IPC Contract
 
-**Status:** P0 implementation in progress on this branch; remaining P1/P2 controls are not yet implemented  
+**Status:** P0 source hardening implemented on this branch; packaged runtime verification remains outstanding. P1/P2 controls are not yet implemented  
 **Scope:** Electron main process, preload bridge, renderer, local files, local AI inference, model downloads, and application updates.  
 **Branch:** `architecture/fototo-next`
 
@@ -75,8 +75,7 @@ Severity describes the risk if the relevant input or execution path is reachable
 ### Potential / requires further verification
 
 - A compromised renderer could potentially invoke privileged handlers if it can reach the exposed bridge. The absence of sender checks increases impact, but a renderer compromise path has not been demonstrated.
-- The current `save-image-to` behavior may also permit writes outside the selected folder through absolute or platform-specific path forms. Exact behavior depends on platform path semantics; enforce containment rather than relying on assumptions.
-- File and image decoding may allow excessive memory or CPU consumption before existing pixel caps are reached. The import path reads the complete file into memory; compressed file size and decoded dimensions need separate limits.
+- File and image decoding may still allow excessive memory or CPU consumption before decoded-pixel limits are applied. Source files are now capped at 512 MiB before and after reading, and AI buffers at 25 megapixels, but regular image decoding still needs an explicit decoded-dimension budget.
 - A compromised or malicious update/model source could affect users if artifact authenticity is not independently verified. No signature bypass or malicious artifact has been demonstrated.
 - CSP compatibility and the minimum safe policy are not yet verified against the complete renderer asset graph.
 
