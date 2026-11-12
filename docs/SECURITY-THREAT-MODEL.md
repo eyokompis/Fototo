@@ -1,6 +1,6 @@
 # Security Threat Model and Safe IPC Contract
 
-**Status:** P0 and Electron-window P1 source hardening implemented on this branch; CI and packaged runtime verification are outstanding. Model supply-chain, updater and P2 controls remain open  
+**Status:** P0 and Electron-window/model-delivery P1 source hardening implemented on this branch; CI verification is recorded below. Packaged runtime verification, updater review and P2 controls remain open  
 **Scope:** Electron main process, preload bridge, renderer, local files, local AI inference, model downloads, and application updates.  
 **Branch:** `architecture/fototo-next`
 
@@ -69,7 +69,7 @@ Severity describes the risk if the relevant input or execution path is reachable
 | Medium | No Content Security Policy was present in the baseline | **Mitigated in source on this branch:** Vite injects a restrictive CSP only into production HTML; development uses a separate Vite response-header policy. Runtime compatibility still needs verification. |
 | Medium | Navigation and new-window restrictions were absent in the baseline | **Mitigated in source on this branch:** unexpected navigation is cancelled, all renderer-created windows are denied, and embedded webviews are blocked. |
 | Medium | Gallery limit is not validated | **Mitigated in this branch:** gallery limits are normalized to the range 1–2,000, with a default of 60. |
-| Medium | Model downloads are not visibly integrity-pinned or size-bounded | Model URLs point at Hugging Face `resolve/main`; the code streams files to disk without an expected digest or maximum byte count. A moving branch is not a stable artifact identity. |
+| Medium | Model downloads were not integrity-pinned or size-bounded | **Mitigated in source on this branch:** Real-ESRGAN URLs use immutable Hugging Face revision `4c80f3da1a8a85f0757a9e7f79e08d0307220eb5`; both artifacts have exact byte counts and SHA-256 pins, streamed size enforcement, hash verification, temporary-file cleanup, and cached-file revalidation. Runtime download/ONNX compatibility still needs verification. |
 | Medium | Update download/install is automatic | Packaged builds enable `autoDownload` and `autoInstallOnAppQuit`. Review the configured update feed, signing verification, release process, and whether users should be able to defer installation. |
 
 ### Potential / requires further verification
@@ -79,7 +79,7 @@ Severity describes the risk if the relevant input or execution path is reachable
 - A compromised or malicious update/model source could affect users if artifact authenticity is not independently verified. No signature bypass or malicious artifact has been demonstrated.
 - CSP compatibility and the minimum safe policy are not yet verified against the complete renderer asset graph.
 
-## 4.1 P0 and Electron-window P1 implementation status on `architecture/fototo-next`
+## 4.1 P0 and P1 implementation status on `architecture/fototo-next`
 
 The following changes have been implemented on this branch and have not been merged into `main`:
 
@@ -89,10 +89,14 @@ The following changes have been implemented on this branch and have not been mer
 - `src/main/security.ts`: shared runtime validation helpers, including an exact app-document navigation allowlist.
 - `src/main/main.ts`: `will-navigate` blocks every URL except the Vite root in development or the exact packaged `dist/index.html`; `setWindowOpenHandler` denies new windows; `will-attach-webview` blocks webviews; the default session denies all permission requests and checks.
 - `vite.config.ts`: production HTML receives a restrictive CSP; Vite development uses a separate response-header policy allowing only local HMR connections and development-only `unsafe-eval`.
-- `tests/security.test.cjs`: Node built-in regression tests for edit ranges, AI payload dimensions/byte lengths, export traversal, filenames, thumbnails and image types.
+- `src/main/model-download.ts`: HTTPS-only Hugging Face source validation, exact-size streaming cap, SHA-256 verification before promotion, `.part` cleanup on failure, and cached-file verification.
+- `src/main/upscaler.ts`: Real-ESRGAN artifacts pinned to immutable revision `4c80f3da1a8a85f0757a9e7f79e08d0307220eb5`; `model.onnx` is pinned to 42,443 bytes / SHA-256 `2d1810f8b75c6a899487decf933697241eafbe6327d7b723674ba6df73a08fda`, and `model.data` to 4,836,096 bytes / SHA-256 `512d0ec9940c2e9d85d27f2952f12a0b77b7841dc22df4ce9f3ea458bc98f37f`. Concurrent downloads for the same model are deduplicated and already verified artifacts are reused.
+- `tests/security.test.cjs`: Node built-in regression tests for edit ranges, AI payload dimensions/byte lengths, export traversal, filenames, thumbnails, image types, and model size/hash validation.
 - `package.json` and CI: `npm test` builds the main-process TypeScript and runs the security tests; CI now runs on `architecture/**` branches and skips the optional ONNX CUDA provider download because this project exercises the CPU provider in CI.
 
-**P0 verification:** GitHub Actions run 43137049343 completed successfully: `npm ci`, `npm run typecheck`, `npm test`, `npm run build`, and `npm run dist:dir` all passed. **P1 verification:** navigation allowlist unit tests have been added. CI runs triggered by the P1 commits must complete successfully. Static policy inspection and CI do not substitute for runtime testing of Vite HMR and packaged Electron on supported operating systems.
+**P0 verification:** GitHub Actions run 43137049343 completed successfully: `npm ci`, `npm run typecheck`, `npm test`, `npm run build`, and `npm run dist:dir` all passed. **Electron P1 verification:** navigation allowlist tests and the Electron build/package jobs passed in GitHub Actions run 43222536228. CSP/HMR and packaged runtime behavior still need hands-on verification.
+
+**Model-delivery P1 verification:** unit tests now cover exact-size/hash acceptance and tampered/wrong-size rejection. The new CI run must pass. The model source commit and LFS object hashes were checked against the public Hugging Face commit page; this does not replace an end-to-end download and ONNX inference test on supported platforms.
 
 ## 5. Required safe IPC contract
 
@@ -248,7 +252,7 @@ Security changes must preserve:
 1. **P0 — Close filesystem authority gaps:** replace renderer-supplied paths with main-owned photo/destination handles; harden export filename and containment; add sender/frame validation.
 2. **P0 — Validate IPC and AI payloads:** introduce centralized runtime schemas and memory/byte budgets before allocation.
 3. **P1 — Harden the window:** source policies and navigation tests implemented; verify CSP/HMR and packaged behavior at runtime.
-4. **P1 — Secure model delivery:** immutable model revision, SHA-256 pinning, size limits, atomic install.
+4. **P1 — Secure model delivery:** immutable revision, SHA-256 pinning, exact size limits and verified temporary-file promotion implemented; end-to-end runtime verification remains.
 5. **P1 — Verify updater chain:** feed ownership, signatures, release process, and user-facing update behavior.
 6. **P2 — Privacy controls:** EXIF/GPS export choice, data-location/clear-data guidance, privacy copy review.
 7. **P2 — Add automated security and regression tests:** make them part of CI before considering the hardening complete.
