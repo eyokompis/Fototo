@@ -61,3 +61,30 @@ test('allows only the expected app navigation target', () => {
   assert.equal(isAllowedAppNavigation(pathToFileURL(path.join(path.dirname(entry), 'other.html')).href, false, entry), false);
   assert.equal(isAllowedAppNavigation('javascript:alert(1)', false, entry), false);
 });
+
+const os = require('node:os');
+const fs = require('node:fs/promises');
+const { createHash } = require('node:crypto');
+const { verifyModelFile, isVerifiedModelFile } = require('../dist-electron/model-download.js');
+
+test('verifies model artifacts by exact byte length and SHA-256', async () => {
+  const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'fototo-model-test-'));
+  const file = path.join(dir, 'model.bin');
+  const bytes = Buffer.from('trusted model bytes');
+  const artifact = {
+    url: 'https://huggingface.co/example/model/resolve/abc/model.bin',
+    sizeBytes: bytes.length,
+    sha256: createHash('sha256').update(bytes).digest('hex'),
+  };
+  try {
+    await fs.writeFile(file, bytes);
+    await verifyModelFile(file, artifact);
+    assert.equal(await isVerifiedModelFile(file, artifact), true);
+    await fs.writeFile(file, Buffer.from('tampered model bytes'));
+    assert.equal(await isVerifiedModelFile(file, artifact), false);
+    await assert.rejects(() => verifyModelFile(file, artifact), /size mismatch|SHA-256 mismatch/);
+    await assert.rejects(() => verifyModelFile(file, { ...artifact, url: 'http://huggingface.co/model' }), /trusted HTTPS/);
+  } finally {
+    await fs.rm(dir, { recursive: true, force: true });
+  }
+});
