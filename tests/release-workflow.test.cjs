@@ -15,7 +15,7 @@ test('release workflow can only be manually dispatched from main', () => {
 });
 
 test('release tag must be semantic version and reachable from main', () => {
-  assert.match(workflow, /TAG_NAME" =~ \^v\[0-9\]+\.\[0-9\]+\.\[0-9\]+\$/);
+  assert.match(workflow, /TAG_NAME" =~ \^v\[0-9\]+\\\.\[0-9\]+\\\.\[0-9\]+\$/);
   assert.match(workflow, /git merge-base --is-ancestor "\$TAG_COMMIT" origin\/main/);
   assert.match(workflow, /git checkout --detach "\$TAG_COMMIT"/);
 });
