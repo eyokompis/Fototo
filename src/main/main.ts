@@ -1,5 +1,4 @@
 import { app, BrowserWindow, dialog, ipcMain, session, type IpcMainInvokeEvent } from 'electron';
-import { autoUpdater } from 'electron-updater';
 import { promises as fs, existsSync, mkdirSync, cpSync } from 'node:fs';
 import path from 'node:path';
 import { randomUUID } from 'node:crypto';
@@ -152,17 +151,7 @@ function createWindow(): void {
     void win.loadFile(indexHtmlPath);
   }
 
-  if (app.isPackaged && process.platform !== 'darwin') {
-    autoUpdater.autoDownload = true;
-    autoUpdater.autoInstallOnAppQuit = true;
-    const send = (message: string) => {
-      if (!win.isDestroyed()) win.webContents.send('update:status', message);
-    };
-    autoUpdater.on('update-available', () => send('Downloading update…'));
-    autoUpdater.on('update-downloaded', () => send('Update downloaded — it installs when you close fototo'));
-    autoUpdater.on('error', () => send('Update check failed (offline?)'));
-    autoUpdater.checkForUpdatesAndNotify().catch(() => undefined);
-  }
+  // Automatic updates stay disabled until signed update manifests are supported by the stable build toolchain.
 }
 
 ipcMain.handle('open-image', async (event) => {
