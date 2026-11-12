@@ -72,6 +72,8 @@ jobs:
             config.mac = { ...config.mac, forceCodeSigning: false, notarize: false };
             fs.writeFileSync(path.join(process.env.RUNNER_TEMP, "fototo-ci-builder.json"), JSON.stringify(config, null, 2));
           '
+      - name: Build application
+        run: npm run build
       - name: Build unsigned platform package
         shell: bash
         run: npx electron-builder --${{ matrix.platform }} ${{ matrix.target }} --publish never --config "$RUNNER_TEMP/fototo-ci-builder.json"
