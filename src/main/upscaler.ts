@@ -1,13 +1,10 @@
 import { app } from 'electron';
-import { createWriteStream } from 'node:fs';
 import { promises as fs } from 'node:fs';
 import path from 'node:path';
-import { Readable } from 'node:stream';
-import { pipeline } from 'node:stream/promises';
 import * as ort from 'onnxruntime-node';
+import { downloadVerifiedModelFile, isVerifiedModelFile, type VerifiedModelArtifact } from './model-download';
 
-export interface ModelFile {
-  url: string;
+export interface ModelFile extends VerifiedModelArtifact {
   name: string;
 }
 
@@ -28,12 +25,16 @@ export const REAL_ESRGAN_X4: ModelInfo = {
   pad: 8,
   files: [
     {
-      url: 'https://huggingface.co/TheGuy444/Real-ESRGAN-ONNX/resolve/main/onnx/model.onnx',
+      url: 'https://huggingface.co/TheGuy444/Real-ESRGAN-ONNX/resolve/4c80f3da1a8a85f0757a9e7f79e08d0307220eb5/onnx/model.onnx',
       name: 'model.onnx',
+      sizeBytes: 42443,
+      sha256: '2d1810f8b75c6a899487decf933697241eafbe6327d7b723674ba6df73a08fda',
     },
     {
-      url: 'https://huggingface.co/TheGuy444/Real-ESRGAN-ONNX/resolve/main/onnx/model.data',
+      url: 'https://huggingface.co/TheGuy444/Real-ESRGAN-ONNX/resolve/4c80f3da1a8a85f0757a9e7f79e08d0307220eb5/onnx/model.data',
       name: 'model.data',
+      sizeBytes: 4836096,
+      sha256: '512d0ec9940c2e9d85d27f2952f12a0b77b7841dc22df4ce9f3ea458bc98f37f',
     },
   ],
 };
@@ -64,28 +65,11 @@ function modelFilePath(model: ModelInfo, file: ModelFile): string {
 
 export async function isModelDownloaded(model: ModelInfo): Promise<boolean> {
   try {
-    await Promise.all(model.files.map((file) => fs.access(modelFilePath(model, file))));
+    await Promise.all(model.files.map((file) => isVerifiedModelFile(modelFilePath(model, file), file)));
     return true;
   } catch {
     return false;
   }
-}
-
-async function downloadFile(url: string, destPath: string, onProgress: (received: number, total: number) => void): Promise<void> {
-  const response = await fetch(url);
-  if (!response.ok || !response.body) {
-    throw new Error(`Model download failed: HTTP ${response.status} for ${url}`);
-  }
-  const total = Number(response.headers.get('content-length') ?? 0);
-  let received = 0;
-  const stream = Readable.fromWeb(response.body as import('node:stream/web').ReadableStream);
-  stream.on('data', (chunk: Buffer) => {
-    received += chunk.length;
-    onProgress(received, total);
-  });
-  const partPath = `${destPath}.part`;
-  await pipeline(stream, createWriteStream(partPath));
-  await fs.rename(partPath, destPath);
 }
 
 export async function downloadModel(model: ModelInfo, onProgress: (progress: UpscaleProgress) => void): Promise<void> {
@@ -93,7 +77,7 @@ export async function downloadModel(model: ModelInfo, onProgress: (progress: Ups
   let done = 0;
   for (const file of model.files) {
     onProgress({ stage: 'download', done, total: model.files.length });
-    await downloadFile(file.url, modelFilePath(model, file), () => undefined);
+    await downloadVerifiedModelFile(file, modelFilePath(model, file));
     done += 1;
   }
   onProgress({ stage: 'download', done, total: model.files.length });
