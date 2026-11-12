@@ -1,4 +1,16 @@
 import path from 'node:path';
+import { pathToFileURL } from 'node:url';
+
+export function isAllowedAppNavigation(rawUrl: string, isDev: boolean, appEntryPath: string): boolean {
+  try {
+    const url = new URL(rawUrl);
+    if (isDev) return url.origin === 'http://localhost:5173' && url.pathname === '/';
+    return url.protocol === 'file:' && url.href === pathToFileURL(path.resolve(appEntryPath)).href;
+  } catch {
+    return false;
+  }
+}
+
 
 export const MAX_IMAGE_BYTES = 512 * 1024 * 1024;
 export const MAX_AI_INPUT_PIXELS = 25_000_000;
