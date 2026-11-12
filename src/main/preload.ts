@@ -1,43 +1,51 @@
 import { contextBridge, ipcRenderer, webUtils } from 'electron';
 
 contextBridge.exposeInMainWorld('fototo', {
-  pathForFile: (file: File): string => {
-    try {
-      return webUtils.getPathForFile(file);
-    } catch {
-      return '';
-    }
-  },
   openImage: (): Promise<{
+    id: string;
     name: string;
-    path: string;
     data: ArrayBuffer;
     edits: { exposure: number; contrast: number; saturation: number; temperature: number } | null;
   } | null> => ipcRenderer.invoke('open-image'),
-  openImageAt: (imagePath: string): Promise<{
+  openDroppedImage: (file: File): Promise<{
+    id: string;
     name: string;
-    path: string;
     data: ArrayBuffer;
     edits: { exposure: number; contrast: number; saturation: number; temperature: number } | null;
-  } | null> => ipcRenderer.invoke('open-image-at', imagePath),
+  } | null> => {
+    let filePath = '';
+    try {
+      filePath = webUtils.getPathForFile(file);
+    } catch {
+      return Promise.resolve(null);
+    }
+    if (!filePath) return Promise.resolve(null);
+    return ipcRenderer.invoke('open-dropped-image', filePath);
+  },
+  openImageAt: (photoId: string): Promise<{
+    id: string;
+    name: string;
+    data: ArrayBuffer;
+    edits: { exposure: number; contrast: number; saturation: number; temperature: number } | null;
+  } | null> => ipcRenderer.invoke('open-image-at', photoId),
   saveEdits: (
-    imagePath: string,
+    photoId: string,
     edits: { exposure: number; contrast: number; saturation: number; temperature: number },
-  ): Promise<boolean> => ipcRenderer.invoke('save-edits', imagePath, edits),
-  recordPhoto: (imagePath: string, name: string, thumbnail: string | null): Promise<boolean> =>
-    ipcRenderer.invoke('library:record', imagePath, name, thumbnail),
+  ): Promise<boolean> => ipcRenderer.invoke('save-edits', photoId, edits),
+  recordPhoto: (photoId: string, name: string, thumbnail: string | null): Promise<boolean> =>
+    ipcRenderer.invoke('library:record', photoId, name, thumbnail),
   recentPhotos: (): Promise<
-    { path: string; name: string; thumbnail: string | null; openedAt: number }[]
+    { id: string; name: string; thumbnail: string | null; openedAt: number }[]
   > => ipcRenderer.invoke('library:recent'),
   libraryPhotos: (limit: number): Promise<
-    { path: string; name: string; thumbnail: string | null; openedAt: number }[]
+    { id: string; name: string; thumbnail: string | null; openedAt: number }[]
   > => ipcRenderer.invoke('library:recent', limit),
   importFolder: (): Promise<number> => ipcRenderer.invoke('library:import-folder'),
   saveImage: (data: ArrayBuffer, defaultName: string): Promise<boolean> =>
     ipcRenderer.invoke('save-image', data, defaultName),
   chooseDirectory: (): Promise<string | null> => ipcRenderer.invoke('choose-directory'),
-  saveImageTo: (data: ArrayBuffer, dirPath: string, fileName: string): Promise<string> =>
-    ipcRenderer.invoke('save-image-to', data, dirPath, fileName),
+  saveImageTo: (data: ArrayBuffer, directoryId: string, fileName: string): Promise<string> =>
+    ipcRenderer.invoke('save-image-to', data, directoryId, fileName),
   modelStatus: (): Promise<{ label: string; downloaded: boolean }> =>
     ipcRenderer.invoke('ai:model-status'),
   upscaleImage: (
