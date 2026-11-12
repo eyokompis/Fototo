@@ -67,12 +67,11 @@ jobs:
           node -e '
             const fs = require("node:fs");
             const path = require("node:path");
-            const os = require("node:os");
             const config = structuredClone(require("./package.json").build);
             config.win = { ...config.win, forceCodeSigning: false };
             config.mac = { ...config.mac, forceCodeSigning: false, notarize: false };
-            fs.writeFileSync(path.join(os.tmpdir(), "fototo-ci-builder.json"), JSON.stringify(config, null, 2));
+            fs.writeFileSync(path.join(process.env.RUNNER_TEMP, "fototo-ci-builder.json"), JSON.stringify(config, null, 2));
           '
       - name: Build unsigned platform package
         shell: bash
-        run: npx electron-builder --${{ matrix.platform }} ${{ matrix.target }} --config "$RUNNER_TEMP/fototo-ci-builder.json"
+        run: npx electron-builder --${{ matrix.platform }} ${{ matrix.target }} --publish never --config "$RUNNER_TEMP/fototo-ci-builder.json"
