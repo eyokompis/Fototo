@@ -190,9 +190,10 @@ A pixel cap alone is insufficient: 100 megapixels of RGBA input is approximately
 ### Application updates
 
 - Verify the production update feed is controlled by the project and uses HTTPS.
-- Preserve platform code-signature and updater signature verification; test invalid and tampered update cases.
-- Document how releases are built, signed, and published, and protect release credentials outside the repository.
-- Consider notifying users and allowing deferral instead of silently downloading and installing on quit.
+- Require platform code signing for Windows and macOS release builds; Windows updater signature verification must remain enabled.
+- Require Ed25519-signed update manifests and verify them before any future update download. The currently pinned stable v26 toolchain does not implement this feature, so automatic updates are disabled and new releases omit update manifests until the stable migration is complete.
+- Build releases only from a tag whose commit is reachable from `main`; create a draft release for manual review. Protect `main`, release tags, and workflow dispatch permissions in GitHub repository settings.
+- Keep signing and notarization credentials in GitHub Actions secrets, not source control.
 - Do not disable signature checks to make local testing easier.
 
 ## 8. Privacy and local-data handling
