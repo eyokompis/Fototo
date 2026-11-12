@@ -1,6 +1,6 @@
 # Security Threat Model and Safe IPC Contract
 
-**Status:** P0 and Electron-window/model-delivery P1 source hardening implemented on this branch; CI verification is recorded below. Packaged runtime verification, updater review and P2 controls remain open  
+**Status:** P0 and Electron-window/model-delivery/release-security P1 source hardening implemented on this branch; CI verification is recorded below. Signed update manifests are not yet enabled; automatic updates are disabled until the stable toolchain supports them.  
 **Scope:** Electron main process, preload bridge, renderer, local files, local AI inference, model downloads, and application updates.  
 **Branch:** `architecture/fototo-next`
 
@@ -38,7 +38,7 @@ Fototo is a local-first desktop photo editor. Its security model should preserve
 | Preload → main IPC | Arguments and sender/frame identity | Runtime schema validation and trusted-sender checks |
 | Renderer → filesystem | File/drop paths and destination paths | Main-owned grants/opaque IDs; user-mediated dialogs |
 | Network → model storage | Redirects, response sizes, bytes, remote artifacts | HTTPS, pinned digest/version, size limits, atomic install |
-| Update service → installed app | Update metadata and packages | Signed updates, trusted feed, controlled install UX |
+| Update service → installed app | Update metadata and packages | Ed25519-signed manifests, platform code signatures, trusted release workflow; auto-updates remain disabled until all are available |
 | Image file → decoder/AI | File bytes, dimensions, decompression behavior | File-size and decoded-pixel limits; bounded processing |
 
 The renderer is not a security boundary. Context isolation and sandboxing reduce exposure but do not make renderer-provided data trustworthy.
@@ -70,7 +70,7 @@ Severity describes the risk if the relevant input or execution path is reachable
 | Medium | Navigation and new-window restrictions were absent in the baseline | **Mitigated in source on this branch:** unexpected navigation is cancelled, all renderer-created windows are denied, and embedded webviews are blocked. |
 | Medium | Gallery limit is not validated | **Mitigated in this branch:** gallery limits are normalized to the range 1–2,000, with a default of 60. |
 | Medium | Model downloads were not integrity-pinned or size-bounded | **Mitigated in source on this branch:** Real-ESRGAN URLs use immutable Hugging Face revision `4c80f3da1a8a85f0757a9e7f79e08d0307220eb5`; both artifacts have exact byte counts and SHA-256 pins, streamed size enforcement, hash verification, temporary-file cleanup, and cached-file revalidation. Runtime download/ONNX compatibility still needs verification. |
-| Medium | Update download/install is automatic | Packaged builds enable `autoDownload` and `autoInstallOnAppQuit`. Review the configured update feed, signing verification, release process, and whether users should be able to defer installation. |
+| High | Update metadata is not cryptographically signed by the current stable toolchain | **Mitigated temporarily in this branch:** automatic update polling/install has been removed, and the release workflow no longer publishes `latest*.yml` or blockmaps. Windows/macOS release builds now fail closed without platform code signing. Signed Ed25519 update manifests remain pending a stable electron-builder release and a protected CI signing key. |
 
 ### Potential / requires further verification
 
@@ -96,7 +96,7 @@ The following changes have been implemented on this branch and have not been mer
 
 **P0 verification:** GitHub Actions run 43137049343 completed successfully: `npm ci`, `npm run typecheck`, `npm test`, `npm run build`, and `npm run dist:dir` all passed. **Electron P1 verification:** navigation allowlist tests and the Electron build/package jobs passed in GitHub Actions run 43222536228. CSP/HMR and packaged runtime behavior still need hands-on verification.
 
-**Model-delivery P1 verification:** unit tests now cover exact-size/hash acceptance and tampered/wrong-size rejection. The new CI run must pass. The model source commit and LFS object hashes were checked against the public Hugging Face commit page; this does not replace an end-to-end download and ONNX inference test on supported platforms.
+**Model-delivery P1 verification:** unit tests now cover exact-size/hash acceptance and tampered/wrong-size rejection. The model source commit and LFS object hashes were checked against the public Hugging Face commit page; this does not replace an end-to-end download and ONNX inference test on supported platforms.\n\n**Release-security P1 verification:** release workflow guardrails and updater-disablement are covered by static regression tests. CI passing does not prove that GitHub secrets exist or that platform certificates/notarization are valid. The workflow intentionally creates a draft release only. Repository rulesets and tag protections still require manual configuration. Signed update manifests are deferred until the signed-manifest implementation is available in a stable electron-builder release; no alpha upgrade was made.
 
 ## 5. Required safe IPC contract
 
