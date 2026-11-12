@@ -241,7 +241,7 @@ async function applyLoadedImage(result: LoadedImage): Promise<void> {
   canvas.style.transform = '';
   applyZoom();
   currentName = result.name;
-  currentPhotoId = result.path;
+  currentPhotoId = result.id;
   fileNameEl.textContent = result.name;
   if (!processor) processor = new ImageProcessor(canvas);
   processor.setImage(bitmap);
