@@ -1,6 +1,6 @@
 # Security Threat Model and Safe IPC Contract
 
-**Status:** P0 source hardening implemented on this branch; packaged runtime verification remains outstanding. P1/P2 controls are not yet implemented  
+**Status:** P0 and Electron-window P1 source hardening implemented on this branch; CI and packaged runtime verification are outstanding. Model supply-chain, updater and P2 controls remain open  
 **Scope:** Electron main process, preload bridge, renderer, local files, local AI inference, model downloads, and application updates.  
 **Branch:** `architecture/fototo-next`
 
@@ -66,8 +66,8 @@ Severity describes the risk if the relevant input or execution path is reachable
 | High | Export path traversal / destination escape | **Mitigated in this branch:** the renderer receives an opaque destination token from the native folder dialog; export names must be safe basenames with PNG/JPEG extensions, and files are created exclusively (`wx`) with collision-safe suffixes. |
 | High | IPC handlers lack visible sender validation | **Mitigated in this branch:** every registered invoke handler checks the main frame and the configured Vite origin or packaged app document before doing privileged work. |
 | Medium | AI payload shape and byte length are not validated at the IPC boundary | **Mitigated in this branch:** AI IPC validates ArrayBuffer type, positive safe-integer dimensions, exact RGBA byte length, and a 25-megapixel input cap before constructing typed arrays. |
-| Medium | No Content Security Policy is present in the inspected `index.html` | There is no CSP meta policy in the document. A policy must be designed for both Vite development and packaged `file://` loading, then tested in both modes. |
-| Medium | Navigation and new-window restrictions are not visible | The inspected window setup does not register `will-navigate` or `setWindowOpenHandler` policies. |
+| Medium | No Content Security Policy was present in the baseline | **Mitigated in source on this branch:** Vite injects a restrictive CSP only into production HTML; development uses a separate Vite response-header policy. Runtime compatibility still needs verification. |
+| Medium | Navigation and new-window restrictions were absent in the baseline | **Mitigated in source on this branch:** unexpected navigation is cancelled, all renderer-created windows are denied, and embedded webviews are blocked. |
 | Medium | Gallery limit is not validated | **Mitigated in this branch:** gallery limits are normalized to the range 1–2,000, with a default of 60. |
 | Medium | Model downloads are not visibly integrity-pinned or size-bounded | Model URLs point at Hugging Face `resolve/main`; the code streams files to disk without an expected digest or maximum byte count. A moving branch is not a stable artifact identity. |
 | Medium | Update download/install is automatic | Packaged builds enable `autoDownload` and `autoInstallOnAppQuit`. Review the configured update feed, signing verification, release process, and whether users should be able to defer installation. |
@@ -79,18 +79,20 @@ Severity describes the risk if the relevant input or execution path is reachable
 - A compromised or malicious update/model source could affect users if artifact authenticity is not independently verified. No signature bypass or malicious artifact has been demonstrated.
 - CSP compatibility and the minimum safe policy are not yet verified against the complete renderer asset graph.
 
-## 4.1 P0 implementation status on `architecture/fototo-next`
+## 4.1 P0 and Electron-window P1 implementation status on `architecture/fototo-next`
 
 The following changes have been implemented on this branch and have not been merged into `main`:
 
 - `src/main/main.ts`: centralized sender/main-frame/origin validation on every invoke handler; main-process photo-ID and export-directory registries; file type/size checks; edit, thumbnail, AI payload and export validation; exclusive collision-safe batch export writes.
 - `src/main/preload.ts`: narrow bridge methods now pass opaque photo IDs and destination tokens instead of arbitrary source and destination paths. Drag-and-drop resolves a real dropped `File` through `webUtils` in preload.
 - `src/renderer/api.ts` and `src/renderer/main.ts`: updated gallery, recents, autosave, drag/drop and batch-export flows to use opaque references; autosave now snapshots the photo ID and edit values before its debounce timer fires, image loading is serialized against AI actions, and asynchronous thumbnail generation captures its original photo target.
-- `src/main/security.ts`: shared runtime validation helpers.
+- `src/main/security.ts`: shared runtime validation helpers, including an exact app-document navigation allowlist.
+- `src/main/main.ts`: `will-navigate` blocks every URL except the Vite root in development or the exact packaged `dist/index.html`; `setWindowOpenHandler` denies new windows; `will-attach-webview` blocks webviews; the default session denies all permission requests and checks.
+- `vite.config.ts`: production HTML receives a restrictive CSP; Vite development uses a separate response-header policy allowing only local HMR connections and development-only `unsafe-eval`.
 - `tests/security.test.cjs`: Node built-in regression tests for edit ranges, AI payload dimensions/byte lengths, export traversal, filenames, thumbnails and image types.
 - `package.json` and CI: `npm test` builds the main-process TypeScript and runs the security tests; CI now runs on `architecture/**` branches and skips the optional ONNX CUDA provider download because this project exercises the CPU provider in CI.
 
-**Verification:** GitHub Actions run 43137049343 completed successfully: `npm ci`, `npm run typecheck`, `npm test`, `npm run build`, and `npm run dist:dir` all passed. This is not a substitute for runtime testing of the packaged Electron app, cross-platform filesystem behavior, or adversarial renderer integration tests.
+**P0 verification:** GitHub Actions run 43137049343 completed successfully: `npm ci`, `npm run typecheck`, `npm test`, `npm run build`, and `npm run dist:dir` all passed. **P1 verification:** navigation allowlist unit tests have been added. CI runs triggered by the P1 commits must complete successfully. Static policy inspection and CI do not substitute for runtime testing of Vite HMR and packaged Electron on supported operating systems.
 
 ## 5. Required safe IPC contract
 
@@ -245,7 +247,7 @@ Security changes must preserve:
 
 1. **P0 — Close filesystem authority gaps:** replace renderer-supplied paths with main-owned photo/destination handles; harden export filename and containment; add sender/frame validation.
 2. **P0 — Validate IPC and AI payloads:** introduce centralized runtime schemas and memory/byte budgets before allocation.
-3. **P1 — Harden the window:** navigation and popup policy, permission denial by default, CSP verified in dev and packaged modes.
+3. **P1 — Harden the window:** source policies and navigation tests implemented; verify CSP/HMR and packaged behavior at runtime.
 4. **P1 — Secure model delivery:** immutable model revision, SHA-256 pinning, size limits, atomic install.
 5. **P1 — Verify updater chain:** feed ownership, signatures, release process, and user-facing update behavior.
 6. **P2 — Privacy controls:** EXIF/GPS export choice, data-location/clear-data guidance, privacy copy review.
