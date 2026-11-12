@@ -85,7 +85,7 @@ The following changes have been implemented on this branch and have not been mer
 
 - `src/main/main.ts`: centralized sender/main-frame/origin validation on every invoke handler; main-process photo-ID and export-directory registries; file type/size checks; edit, thumbnail, AI payload and export validation; exclusive collision-safe batch export writes.
 - `src/main/preload.ts`: narrow bridge methods now pass opaque photo IDs and destination tokens instead of arbitrary source and destination paths. Drag-and-drop resolves a real dropped `File` through `webUtils` in preload.
-- `src/renderer/api.ts` and `src/renderer/main.ts`: updated gallery, recents, autosave, drag/drop and batch-export flows to use opaque references.
+- `src/renderer/api.ts` and `src/renderer/main.ts`: updated gallery, recents, autosave, drag/drop and batch-export flows to use opaque references; autosave now snapshots the photo ID and edit values before its debounce timer fires, image switching is blocked during AI actions, and asynchronous thumbnail generation captures its original photo target.
 - `src/main/security.ts`: shared runtime validation helpers.
 - `tests/security.test.cjs`: Node built-in regression tests for edit ranges, AI payload dimensions/byte lengths, export traversal, filenames, thumbnails and image types.
 - `package.json` and CI: `npm test` builds the main-process TypeScript and runs the security tests; CI now runs on `architecture/**` branches and skips the optional ONNX CUDA provider download because this project exercises the CPU provider in CI.
