@@ -205,7 +205,7 @@ ipcMain.handle('library:recent', async (event, limit?: unknown) => {
   return entries.map((entry) => ({
     id: registerPhotoPath(entry.path),
     name: entry.name,
-    thumbnail: entry.thumbnail,
+    thumbnail: validateThumbnail(entry.thumbnail) ? entry.thumbnail : null,
     openedAt: entry.openedAt,
   }));
 });
