@@ -1,4 +1,4 @@
-import { app, BrowserWindow, dialog, ipcMain, type IpcMainInvokeEvent } from 'electron';
+import { app, BrowserWindow, dialog, ipcMain, session, type IpcMainInvokeEvent } from 'electron';
 import { autoUpdater } from 'electron-updater';
 import { promises as fs, existsSync, mkdirSync, cpSync } from 'node:fs';
 import path from 'node:path';
@@ -9,6 +9,7 @@ import { loadEdits, saveEdits, type ImageEdits } from './edits';
 import { recentPhotos, recordPhoto } from './library';
 import {
   MAX_IMAGE_BYTES,
+  isAllowedAppNavigation,
   validateBinaryExport,
   validateExportFileName,
   validateImageBuffer,
@@ -118,6 +119,7 @@ async function saveUniqueExport(dirPath: string, fileName: string, data: ArrayBu
 }
 
 function createWindow(): void {
+  const indexHtmlPath = path.join(__dirname, '..', 'dist', 'index.html');
   const win = new BrowserWindow({
     width: 1280,
     height: 840,
@@ -133,10 +135,21 @@ function createWindow(): void {
     },
   });
 
+  const { webContents } = win;
+  webContents.on('will-navigate', (event, navigationUrl) => {
+    if (!isAllowedAppNavigation(navigationUrl, isDev, indexHtmlPath)) event.preventDefault();
+  });
+  webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
+  webContents.on('will-attach-webview', (event) => event.preventDefault());
+
+  const appSession = session.defaultSession;
+  appSession.setPermissionRequestHandler((_webContents, _permission, callback) => callback(false));
+  appSession.setPermissionCheckHandler(() => false);
+
   if (isDev) {
-    win.loadURL('http://localhost:5173');
+    void win.loadURL('http://localhost:5173');
   } else {
-    win.loadFile(path.join(__dirname, '..', 'dist', 'index.html'));
+    void win.loadFile(indexHtmlPath);
   }
 
   if (app.isPackaged && process.platform !== 'darwin') {
