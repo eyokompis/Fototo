@@ -35,6 +35,7 @@ test('Windows and macOS distributables fail closed without code signing', () => 
   assert.equal(packageJson.build.win.forceCodeSigning, true);
   assert.equal(packageJson.build.win.verifyUpdateCodeSignature, true);
   assert.equal(packageJson.build.mac.forceCodeSigning, true);
+  assert.equal(packageJson.build.mac.notarize, true);
 });
 
 test('runtime does not poll or install unsigned automatic updates', () => {
