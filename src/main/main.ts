@@ -1,13 +1,27 @@
-import { app, BrowserWindow, dialog, ipcMain } from 'electron';
+import { app, BrowserWindow, dialog, ipcMain, type IpcMainInvokeEvent } from 'electron';
 import { autoUpdater } from 'electron-updater';
 import { promises as fs, existsSync, mkdirSync, cpSync } from 'node:fs';
 import path from 'node:path';
+import { randomUUID } from 'node:crypto';
 import { downloadModel, isModelDownloaded, REAL_ESRGAN_X4, upscaleImage } from './upscaler';
 import { enhanceLowLight } from './enhancer';
 import { loadEdits, saveEdits, type ImageEdits } from './edits';
 import { recentPhotos, recordPhoto } from './library';
+import {
+  MAX_IMAGE_BYTES,
+  validateBinaryExport,
+  validateExportFileName,
+  validateImageBuffer,
+  validateImageEdits,
+  validateImageExtension,
+  validateImageName,
+  validateThumbnail,
+} from './security';
 
 const isDev = !app.isPackaged;
+const photoPathById = new Map<string, string>();
+const photoIdByPath = new Map<string, string>();
+const directoryPathById = new Map<string, string>();
 
 function migrateUserData(): void {
   if (!app.isPackaged) return;
@@ -28,6 +42,76 @@ function migrateUserData(): void {
   } catch {
     return;
   }
+}
+
+function assertTrustedSender(event: IpcMainInvokeEvent): void {
+  const frame = event.senderFrame;
+  if (!frame || frame !== event.sender.mainFrame) throw new Error('Untrusted IPC frame');
+  let url: URL;
+  try {
+    url = new URL(frame.url);
+  } catch {
+    throw new Error('Invalid IPC sender URL');
+  }
+  if (isDev) {
+    if (url.origin !== 'http://localhost:5173') throw new Error('Untrusted IPC sender');
+  } else if (url.protocol !== 'file:' || !url.pathname.endsWith('/dist/index.html')) {
+    throw new Error('Untrusted IPC sender');
+  }
+}
+
+function registerPhotoPath(filePath: string): string {
+  const existing = photoIdByPath.get(filePath);
+  if (existing) return existing;
+  const id = randomUUID();
+  photoPathById.set(id, filePath);
+  photoIdByPath.set(filePath, id);
+  return id;
+}
+
+function resolvePhotoPath(photoId: unknown): string {
+  if (typeof photoId !== 'string' || photoId.length > 64) throw new Error('Invalid photo reference');
+  const filePath = photoPathById.get(photoId);
+  if (!filePath) throw new Error('Unknown photo reference');
+  return filePath;
+}
+
+async function readImage(filePath: string) {
+  if (!validateImageExtension(filePath)) throw new Error('Unsupported image type');
+  const stat = await fs.stat(filePath);
+  if (!stat.isFile() || stat.size <= 0 || stat.size > MAX_IMAGE_BYTES) {
+    throw new Error('Image file is too large or invalid');
+  }
+  const data = await fs.readFile(filePath);
+  const edits = await loadEdits(filePath);
+  return {
+    id: registerPhotoPath(filePath),
+    name: path.basename(filePath),
+    data: data.buffer.slice(data.byteOffset, data.byteOffset + data.byteLength),
+    edits,
+  };
+}
+
+function validateAiRequest(image: unknown): image is { data: ArrayBuffer; width: number; height: number } {
+  if (!image || typeof image !== 'object' || Array.isArray(image)) return false;
+  const value = image as Record<string, unknown>;
+  return validateImageBuffer(value.data, value.width, value.height);
+}
+
+async function saveUniqueExport(dirPath: string, fileName: string, data: ArrayBuffer): Promise<string> {
+  const ext = path.extname(fileName);
+  const base = path.basename(fileName, ext);
+  for (let i = 0; i < 1000; i++) {
+    const name = i === 0 ? fileName : `${base} (${i})${ext}`;
+    const target = path.join(dirPath, name);
+    try {
+      await fs.writeFile(target, Buffer.from(data), { flag: 'wx' });
+      return name;
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code !== 'EEXIST') throw error;
+    }
+  }
+  throw new Error('Could not find an unused export filename');
 }
 
 function createWindow(): void {
@@ -65,7 +149,8 @@ function createWindow(): void {
   }
 }
 
-ipcMain.handle('open-image', async () => {
+ipcMain.handle('open-image', async (event) => {
+  assertTrustedSender(event);
   const result = await dialog.showOpenDialog({
     title: 'Open photo',
     properties: ['openFile'],
@@ -74,68 +159,83 @@ ipcMain.handle('open-image', async () => {
     ],
   });
   if (result.canceled || result.filePaths.length === 0) return null;
-  const filePath = result.filePaths[0];
-  const data = await fs.readFile(filePath);
-  const edits = await loadEdits(filePath);
-  return {
-    name: path.basename(filePath),
-    path: filePath,
-    data: data.buffer.slice(data.byteOffset, data.byteOffset + data.byteLength),
-    edits,
-  };
+  return readImage(result.filePaths[0]);
 });
 
-ipcMain.handle('save-edits', async (_event, imagePath: string, edits: ImageEdits) => {
-  await saveEdits(imagePath, edits);
+ipcMain.handle('open-dropped-image', async (event, filePath: unknown) => {
+  assertTrustedSender(event);
+  if (typeof filePath !== 'string' || filePath.length > 4096 || !path.isAbsolute(filePath)) {
+    throw new Error('Invalid dropped file');
+  }
+  return readImage(filePath);
+});
+
+ipcMain.handle('save-edits', async (event, photoId: unknown, edits: unknown) => {
+  assertTrustedSender(event);
+  if (!validateImageEdits(edits)) throw new Error('Invalid image adjustments');
+  await saveEdits(resolvePhotoPath(photoId), edits as ImageEdits);
   return true;
 });
 
-ipcMain.handle('open-image-at', async (_event, imagePath: string) => {
+ipcMain.handle('open-image-at', async (event, photoId: unknown) => {
+  assertTrustedSender(event);
   try {
-    const data = await fs.readFile(imagePath);
-    const edits = await loadEdits(imagePath);
-    return {
-      name: path.basename(imagePath),
-      path: imagePath,
-      data: data.buffer.slice(data.byteOffset, data.byteOffset + data.byteLength),
-      edits,
-    };
+    return await readImage(resolvePhotoPath(photoId));
   } catch {
     return null;
   }
 });
 
-ipcMain.handle('library:record', async (_event, imagePath: string, name: string, thumbnail: string | null) => {
-  await recordPhoto(imagePath, name, thumbnail);
+ipcMain.handle('library:record', async (event, photoId: unknown, name: unknown, thumbnail: unknown) => {
+  assertTrustedSender(event);
+  if (!validateImageName(name) || !validateThumbnail(thumbnail)) throw new Error('Invalid library entry');
+  await recordPhoto(resolvePhotoPath(photoId), name, thumbnail);
   return true;
 });
 
-ipcMain.handle('library:recent', async (_event, limit?: number) => recentPhotos(limit));
+ipcMain.handle('library:recent', async (event, limit?: unknown) => {
+  assertTrustedSender(event);
+  const safeLimit = typeof limit === 'number' && Number.isFinite(limit)
+    ? Math.min(2000, Math.max(1, Math.floor(limit)))
+    : 60;
+  const entries = await recentPhotos(safeLimit);
+  return entries.map((entry) => ({
+    id: registerPhotoPath(entry.path),
+    name: entry.name,
+    thumbnail: entry.thumbnail,
+    openedAt: entry.openedAt,
+  }));
+});
 
-ipcMain.handle('library:import-folder', async () => {
+ipcMain.handle('library:import-folder', async (event) => {
+  assertTrustedSender(event);
   const result = await dialog.showOpenDialog({
     title: 'Add folder to gallery',
     properties: ['openDirectory'],
   });
   if (result.canceled || result.filePaths.length === 0) return 0;
   const dir = result.filePaths[0];
-  const exts = new Set(['.png', '.jpg', '.jpeg', '.webp', '.gif', '.bmp', '.avif']);
   const entries = await fs.readdir(dir, { withFileTypes: true });
   let count = 0;
   for (const entry of entries) {
-    if (!entry.isFile() || !exts.has(path.extname(entry.name).toLowerCase())) continue;
+    if (!entry.isFile() || !validateImageExtension(entry.name)) continue;
     await recordPhoto(path.join(dir, entry.name), entry.name, null);
     count += 1;
   }
   return count;
 });
 
-ipcMain.handle('ai:model-status', async () => ({
-  label: REAL_ESRGAN_X4.label,
-  downloaded: await isModelDownloaded(REAL_ESRGAN_X4),
-}));
+ipcMain.handle('ai:model-status', async (event) => {
+  assertTrustedSender(event);
+  return {
+    label: REAL_ESRGAN_X4.label,
+    downloaded: await isModelDownloaded(REAL_ESRGAN_X4),
+  };
+});
 
-ipcMain.handle('ai:upscale', async (event, image: { data: ArrayBuffer; width: number; height: number }) => {
+ipcMain.handle('ai:upscale', async (event, image: unknown) => {
+  assertTrustedSender(event);
+  if (!validateAiRequest(image)) throw new Error('Invalid AI image payload');
   const send = (progress: { stage: string; done: number; total: number }) => {
     if (!event.sender.isDestroyed()) event.sender.send('ai:progress', progress);
   };
@@ -147,41 +247,46 @@ ipcMain.handle('ai:upscale', async (event, image: { data: ArrayBuffer; width: nu
   return { data: result.data.buffer, width: result.width, height: result.height };
 });
 
-ipcMain.handle('ai:enhance', async (_event, image: { data: ArrayBuffer; width: number; height: number }) => {
+ipcMain.handle('ai:enhance', async (event, image: unknown) => {
+  assertTrustedSender(event);
+  if (!validateAiRequest(image)) throw new Error('Invalid AI image payload');
   const rgba = new Uint8ClampedArray(image.data);
   const result = await enhanceLowLight(rgba, image.width, image.height);
   return { data: result.data.buffer, width: result.width, height: result.height };
 });
 
-ipcMain.handle('choose-directory', async () => {
+ipcMain.handle('choose-directory', async (event) => {
+  assertTrustedSender(event);
   const result = await dialog.showOpenDialog({
     title: 'Choose output folder',
     properties: ['openDirectory', 'createDirectory'],
   });
   if (result.canceled || result.filePaths.length === 0) return null;
-  return result.filePaths[0];
+  const id = randomUUID();
+  directoryPathById.set(id, result.filePaths[0]);
+  return id;
 });
 
-ipcMain.handle('save-image-to', async (_event, data: ArrayBuffer, dirPath: string, fileName: string) => {
-  const ext = path.extname(fileName);
-  const base = path.basename(fileName, ext);
-  let name = fileName;
-  for (let i = 1; i < 1000; i++) {
-    try {
-      await fs.access(path.join(dirPath, name));
-      name = `${base} (${i})${ext}`;
-    } catch {
-      break;
-    }
+ipcMain.handle('save-image-to', async (event, data: unknown, directoryId: unknown, fileName: unknown) => {
+  assertTrustedSender(event);
+  if (!validateBinaryExport(data) || !validateExportFileName(fileName)) {
+    throw new Error('Invalid export payload');
   }
-  await fs.writeFile(path.join(dirPath, name), Buffer.from(data));
-  return name;
+  if (typeof directoryId !== 'string' || !directoryPathById.has(directoryId)) {
+    throw new Error('Unknown export directory reference');
+  }
+  return saveUniqueExport(directoryPathById.get(directoryId)!, fileName, data);
 });
 
-ipcMain.handle('save-image', async (_event, data: ArrayBuffer, defaultName: string) => {
+ipcMain.handle('save-image', async (event, data: unknown, defaultName: unknown) => {
+  assertTrustedSender(event);
+  if (!validateBinaryExport(data) || typeof defaultName !== 'string' || defaultName.length > 180) {
+    throw new Error('Invalid export payload');
+  }
+  const safeDefaultName = path.basename(defaultName).replace(/[\\/\0<>:"|?*]/g, '_');
   const result = await dialog.showSaveDialog({
     title: 'Save photo',
-    defaultPath: defaultName,
+    defaultPath: safeDefaultName || 'photo.png',
   });
   if (result.canceled || !result.filePath) return false;
   await fs.writeFile(result.filePath, Buffer.from(data));
