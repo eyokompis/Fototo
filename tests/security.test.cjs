@@ -1,7 +1,10 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
+const path = require('node:path');
+const { pathToFileURL } = require('node:url');
 const {
   MAX_AI_INPUT_PIXELS,
+  isAllowedAppNavigation,
   validateBinaryExport,
   validateExportFileName,
   validateImageBuffer,
@@ -46,4 +49,15 @@ test('validates names, thumbnails, binary exports and image extensions', () => {
   assert.equal(validateBinaryExport(new ArrayBuffer(0)), false);
   assert.equal(validateImageExtension('/photos/portrait.webp'), true);
   assert.equal(validateImageExtension('/photos/notes.txt'), false);
+});
+
+
+test('allows only the expected app navigation target', () => {
+  const entry = path.resolve('/opt/Fototo/resources/app/dist/index.html');
+  assert.equal(isAllowedAppNavigation('http://localhost:5173/', true, entry), true);
+  assert.equal(isAllowedAppNavigation('http://localhost:5173/other', true, entry), false);
+  assert.equal(isAllowedAppNavigation('https://example.com/', true, entry), false);
+  assert.equal(isAllowedAppNavigation(pathToFileURL(entry).href, false, entry), true);
+  assert.equal(isAllowedAppNavigation(pathToFileURL(path.join(path.dirname(entry), 'other.html')).href, false, entry), false);
+  assert.equal(isAllowedAppNavigation('javascript:alert(1)', false, entry), false);
 });
