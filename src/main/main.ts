@@ -83,6 +83,9 @@ async function readImage(filePath: string) {
     throw new Error('Image file is too large or invalid');
   }
   const data = await fs.readFile(filePath);
+  if (data.byteLength <= 0 || data.byteLength > MAX_IMAGE_BYTES) {
+    throw new Error('Image file is too large or invalid');
+  }
   const edits = await loadEdits(filePath);
   return {
     id: registerPhotoPath(filePath),
