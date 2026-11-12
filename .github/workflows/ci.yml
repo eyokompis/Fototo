@@ -28,23 +28,51 @@ jobs:
             const vulns = report.vulnerabilities || {};
             for (const [name, item] of Object.entries(vulns)) {
               const via = (item.via || []).map(v => typeof v === "string" ? v : v.title).join("; ");
-              console.log(`${item.severity.toUpperCase()} ${name}@${item.range} direct=${item.isDirect} fix=${JSON.stringify(item.fixAvailable)} advisories=${via}`);
+              console.log(item.severity.toUpperCase() + " " + name + "@" + item.range + " direct=" + item.isDirect + " fix=" + JSON.stringify(item.fixAvailable) + " advisories=" + via);
             }
-            console.log(`Audit totals: ${JSON.stringify(report.metadata?.vulnerabilities || {})}`);
+            console.log("Audit totals: " + JSON.stringify(report.metadata?.vulnerabilities || {}));
           ' "$RUNNER_TEMP/npm-audit.json"
       - run: npm run typecheck
       - run: npm test
       - run: npm run build
 
   package:
-    runs-on: ubuntu-latest
-    env:
-      ONNXRUNTIME_NODE_INSTALL: 'skip'
+    name: Package (${{ matrix.platform }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            platform: win
+            target: nsis
+          - os: macos-latest
+            platform: mac
+            target: dmg
+          - os: ubuntu-latest
+            platform: linux
+            target: AppImage
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: 22
           cache: npm
+      # Install the real platform-specific ONNX Runtime native binary.
       - run: npm ci
-      - run: npm run dist:dir
+      - name: Create unsigned CI-only packaging configuration
+        shell: bash
+        run: |
+          node -e '
+            const fs = require("node:fs");
+            const path = require("node:path");
+            const os = require("node:os");
+            const config = structuredClone(require("./package.json").build);
+            config.win = { ...config.win, forceCodeSigning: false };
+            config.mac = { ...config.mac, forceCodeSigning: false, notarize: false };
+            fs.writeFileSync(path.join(os.tmpdir(), "fototo-ci-builder.json"), JSON.stringify(config, null, 2));
+          '
+      - name: Build unsigned platform package
+        shell: bash
+        run: npx electron-builder --${{ matrix.platform }} ${{ matrix.target }} --config "$RUNNER_TEMP/fototo-ci-builder.json"
