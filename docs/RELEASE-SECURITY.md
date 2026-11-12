@@ -5,6 +5,10 @@
 
 ## Current decision
 
+## Branch-only status
+
+All controls described here currently exist only on `architecture/fototo-next`. The existing `main` branch and already published application builds have not been changed. The manual Release workflow becomes available from the `main` branch only after these changes have been reviewed and explicitly merged. Do not treat the branch's workflow as an active production release process before that point.
+
 The project currently pins `electron-builder` 26.18.0 and `electron-updater` 6.8.11. The stable v26 toolchain does not provide the Ed25519 signed update-manifest verification introduced in electron-builder v27. v27 is still prerelease in the currently reviewed package registry, so Fototo does not jump to an alpha release merely to obtain this security feature.
 
 Until the stable toolchain supports signed manifests and the release key is provisioned:
