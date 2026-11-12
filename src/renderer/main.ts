@@ -282,17 +282,20 @@ async function applyLoadedImage(result: LoadedImage): Promise<void> {
 }
 
 async function recordThumbnail(): Promise<void> {
-  if (!bitmap || !currentPhotoId) return;
+  const targetBitmap = bitmap;
+  const photoId = currentPhotoId;
+  const name = currentName;
+  if (!targetBitmap || !photoId) return;
   try {
     const maxDim = 160;
-    const scale = Math.min(1, maxDim / Math.max(bitmap.width, bitmap.height));
+    const scale = Math.min(1, maxDim / Math.max(targetBitmap.width, targetBitmap.height));
     const thumbCanvas = new OffscreenCanvas(
-      Math.max(1, Math.round(bitmap.width * scale)),
-      Math.max(1, Math.round(bitmap.height * scale)),
+      Math.max(1, Math.round(targetBitmap.width * scale)),
+      Math.max(1, Math.round(targetBitmap.height * scale)),
     );
     const ctx = thumbCanvas.getContext('2d');
     if (!ctx) return;
-    ctx.drawImage(bitmap, 0, 0, thumbCanvas.width, thumbCanvas.height);
+    ctx.drawImage(targetBitmap, 0, 0, thumbCanvas.width, thumbCanvas.height);
     const blob = await thumbCanvas.convertToBlob({ type: 'image/jpeg', quality: 0.7 });
     const dataUrl = await new Promise<string>((resolve, reject) => {
       const reader = new FileReader();
@@ -300,7 +303,7 @@ async function recordThumbnail(): Promise<void> {
       reader.onerror = () => reject(reader.error);
       reader.readAsDataURL(blob);
     });
-    await window.fototo.recordPhoto(currentPhotoId, currentName, dataUrl);
+    await window.fototo.recordPhoto(photoId, name, dataUrl);
   } catch {
     void 0;
   }
