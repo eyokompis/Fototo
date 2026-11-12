@@ -70,7 +70,7 @@ const sliders: Record<keyof Adjustments, HTMLInputElement> = {
 let processor: ImageProcessor | null = null;
 let bitmap: ImageBitmap | null = null;
 let currentName = 'photo.png';
-let currentPath: string | null = null;
+let currentPhotoId: string | null = null;
 let adjustments: Adjustments = { ...DEFAULT_ADJUSTMENTS };
 let busy = false;
 let saveTimer: ReturnType<typeof setTimeout> | null = null;
@@ -133,11 +133,11 @@ function finishProgress(message: string): void {
 }
 
 function scheduleSave(): void {
-  if (!currentPath) return;
+  if (!currentPhotoId) return;
   if (saveTimer) clearTimeout(saveTimer);
   saveTimer = setTimeout(() => {
     saveTimer = null;
-    window.fototo.saveEdits(currentPath!, adjustments).catch(() => undefined);
+    window.fototo.saveEdits(currentPhotoId!, adjustments).catch(() => undefined);
   }, 400);
 }
 
@@ -220,8 +220,8 @@ async function loadImage(): Promise<void> {
   await applyLoadedImage(result);
 }
 
-async function openRecent(imagePath: string): Promise<void> {
-  const result = await window.fototo.openImageAt(imagePath);
+async function openRecent(photoId: string): Promise<void> {
+  const result = await window.fototo.openImageAt(photoId);
   if (!result) {
     setStatus('Could not open photo (file missing?)');
     return;
@@ -241,7 +241,7 @@ async function applyLoadedImage(result: LoadedImage): Promise<void> {
   canvas.style.transform = '';
   applyZoom();
   currentName = result.name;
-  currentPath = result.path;
+  currentPhotoId = result.path;
   fileNameEl.textContent = result.name;
   if (!processor) processor = new ImageProcessor(canvas);
   processor.setImage(bitmap);
@@ -266,7 +266,7 @@ async function applyLoadedImage(result: LoadedImage): Promise<void> {
 }
 
 async function recordThumbnail(): Promise<void> {
-  if (!bitmap || !currentPath) return;
+  if (!bitmap || !currentPhotoId) return;
   try {
     const maxDim = 160;
     const scale = Math.min(1, maxDim / Math.max(bitmap.width, bitmap.height));
@@ -284,7 +284,7 @@ async function recordThumbnail(): Promise<void> {
       reader.onerror = () => reject(reader.error);
       reader.readAsDataURL(blob);
     });
-    await window.fototo.recordPhoto(currentPath, currentName, dataUrl);
+    await window.fototo.recordPhoto(currentPhotoId, currentName, dataUrl);
   } catch {
     void 0;
   }
@@ -313,7 +313,7 @@ async function loadRecents(): Promise<void> {
       const label = document.createElement('span');
       label.textContent = entry.name;
       item.appendChild(label);
-      item.addEventListener('click', () => openRecent(entry.path));
+      item.addEventListener('click', () => openRecent(entry.id));
       recentsGrid.appendChild(item);
     }
   } catch {
@@ -668,7 +668,7 @@ async function loadGallery(): Promise<void> {
     for (const entry of entries) {
       const item = document.createElement('button');
       item.className = 'gallery-item';
-      item.title = entry.path;
+      item.title = entry.name;
       if (entry.thumbnail) {
         const img = document.createElement('img');
         img.src = entry.thumbnail;
@@ -685,18 +685,18 @@ async function loadGallery(): Promise<void> {
       item.appendChild(label);
       item.addEventListener('click', () => {
         if (selecting) {
-          if (selectedPaths.has(entry.path)) {
-            selectedPaths.delete(entry.path);
+          if (selectedPaths.has(entry.id)) {
+            selectedPaths.delete(entry.id);
             item.classList.remove('selected');
           } else {
-            selectedPaths.add(entry.path);
+            selectedPaths.add(entry.id);
             item.classList.add('selected');
           }
           updateBatchBar();
           return;
         }
         galleryDialog.close();
-        void openRecent(entry.path);
+        void openRecent(entry.id);
       });
       galleryGrid.appendChild(item);
     }
@@ -742,12 +742,13 @@ async function runBatch(op: 'upscale' | 'enhance'): Promise<void> {
   let done = 0;
   let failed = 0;
   for (let i = 0; i < paths.length; i++) {
-    const photoPath = paths[i];
-    const name = photoPath.split(/[\\/]/).pop() ?? photoPath;
-    showProgress(`Batch ${i + 1}/${paths.length} — ${name}`, i / paths.length);
+    const photoId = paths[i];
+    showProgress(`Batch ${i + 1}/${paths.length}`, i / paths.length);
     try {
-      const loaded = await window.fototo.openImageAt(photoPath);
+      const loaded = await window.fototo.openImageAt(photoId);
       if (!loaded) throw new Error('unreadable');
+      const name = loaded.name;
+      showProgress(`Batch ${i + 1}/${paths.length} — ${name}`, i / paths.length);
       const source = await createImageBitmap(new Blob([loaded.data]));
       const image = extractPixels(source);
       if (!image) throw new Error('decode failed');
@@ -1001,10 +1002,11 @@ window.addEventListener('drop', (e) => {
     setStatus('Not an image file');
     return;
   }
-  const filePath = window.fototo.pathForFile(file);
-  if (!filePath) {
-    setStatus('Could not open dropped photo');
-    return;
-  }
-  openRecent(filePath).catch(() => setStatus('Could not open photo'));
+  void window.fototo.openDroppedImage(file).then(async (result) => {
+    if (!result) {
+      setStatus('Could not open dropped photo');
+      return;
+    }
+    await applyLoadedImage(result);
+  }).catch(() => setStatus('Could not open photo'));
 });
