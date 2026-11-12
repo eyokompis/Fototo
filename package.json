@@ -19,7 +19,8 @@
     "build": "npm run build:renderer && npm run build:main",
     "start": "npm run build && electron .",
     "dist": "npm run build && electron-builder",
-    "dist:dir": "npm run build && electron-builder --dir"
+    "dist:dir": "npm run build && electron-builder --dir",
+    "test": "npm run build:main && node --test tests/security.test.cjs"
   },
   "devDependencies": {
     "@types/sql.js": "^1.4.11",
