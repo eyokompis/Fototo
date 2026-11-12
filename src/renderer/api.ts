@@ -6,14 +6,14 @@ export interface ImageEdits {
 }
 
 export interface LoadedImage {
+  id: string;
   name: string;
-  path: string;
   data: ArrayBuffer;
   edits: ImageEdits | null;
 }
 
 export interface LibraryEntry {
-  path: string;
+  id: string;
   name: string;
   thumbnail: string | null;
   openedAt: number;
@@ -37,17 +37,17 @@ export interface RawImage {
 }
 
 export interface FototoApi {
-  pathForFile(file: File): string;
   openImage(): Promise<LoadedImage | null>;
-  openImageAt(imagePath: string): Promise<LoadedImage | null>;
-  saveEdits(imagePath: string, edits: ImageEdits): Promise<boolean>;
-  recordPhoto(imagePath: string, name: string, thumbnail: string | null): Promise<boolean>;
+  openDroppedImage(file: File): Promise<LoadedImage | null>;
+  openImageAt(photoId: string): Promise<LoadedImage | null>;
+  saveEdits(photoId: string, edits: ImageEdits): Promise<boolean>;
+  recordPhoto(photoId: string, name: string, thumbnail: string | null): Promise<boolean>;
   recentPhotos(limit?: number): Promise<LibraryEntry[]>;
   libraryPhotos(limit: number): Promise<LibraryEntry[]>;
   importFolder(): Promise<number>;
   saveImage(data: ArrayBuffer, defaultName: string): Promise<boolean>;
   chooseDirectory(): Promise<string | null>;
-  saveImageTo(data: ArrayBuffer, dirPath: string, fileName: string): Promise<string>;
+  saveImageTo(data: ArrayBuffer, directoryId: string, fileName: string): Promise<string>;
   modelStatus(): Promise<ModelStatus>;
   upscaleImage(image: RawImage): Promise<RawImage>;
   enhanceImage(image: RawImage): Promise<RawImage>;
