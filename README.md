@@ -6,7 +6,7 @@ Enhance the quality, light and upscale your photos, locally or with AI.
 
 A fast, private desktop photo editor: real-time light and color adjustments, one-click AI upscaling (4×) and low-light enhancement, non-destructive edits, a built-in photo library with gallery and batch processing. Everything runs on your machine — photos never leave it.
 
-**[Download the latest installer](https://github.com/eyokompis/fototo/releases/latest)** for Windows, macOS (Apple Silicon & Intel), and Linux.
+**[Download the latest installer](https://github.com/eyokompis/fototo/releases/latest)** for Windows, macOS 13 Ventura or later (Apple Silicon & Intel), and Linux.
 
 ## Stack
 
