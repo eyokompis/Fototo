@@ -20,7 +20,7 @@
     "start": "npm run build && electron .",
     "dist": "npm run build && electron-builder",
     "dist:dir": "npm run build && electron-builder --dir",
-    "test": "npm run build:main && node --test tests/security.test.cjs"
+    "test": "npm run build:main && node --test tests/security.test.cjs tests/release-workflow.test.cjs"
   },
   "devDependencies": {
     "@types/sql.js": "^1.4.11",
@@ -66,7 +66,9 @@
       "files": [
         "!**/node_modules/onnxruntime-node/bin/napi-v6/linux/**",
         "!**/node_modules/onnxruntime-node/bin/napi-v6/darwin/**"
-      ]
+      ],
+      "forceCodeSigning": true,
+      "verifyUpdateCodeSignature": true
     },
     "mac": {
       "target": [
@@ -82,7 +84,8 @@
       "files": [
         "!**/node_modules/onnxruntime-node/bin/napi-v6/linux/**",
         "!**/node_modules/onnxruntime-node/bin/napi-v6/win32/**"
-      ]
+      ],
+      "forceCodeSigning": true
     },
     "linux": {
       "target": "AppImage",
