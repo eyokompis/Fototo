@@ -73,6 +73,7 @@ let currentName = 'photo.png';
 let currentPhotoId: string | null = null;
 let adjustments: Adjustments = { ...DEFAULT_ADJUSTMENTS };
 let busy = false;
+let loadingImage = false;
 let saveTimer: ReturnType<typeof setTimeout> | null = null;
 let pendingSave: { photoId: string; edits: Adjustments } | null = null;
 let zoom: number | null = null;
@@ -227,21 +228,31 @@ async function redo(): Promise<void> {
 }
 
 async function loadImage(): Promise<void> {
-  if (busy) return;
-  const result = await window.fototo.openImage();
-  if (!result || busy) return;
-  await applyLoadedImage(result);
+  if (busy || loadingImage) return;
+  loadingImage = true;
+  try {
+    const result = await window.fototo.openImage();
+    if (!result || busy) return;
+    await applyLoadedImage(result);
+  } finally {
+    loadingImage = false;
+  }
 }
 
 async function openRecent(photoId: string): Promise<void> {
-  if (busy) return;
-  const result = await window.fototo.openImageAt(photoId);
-  if (busy) return;
-  if (!result) {
-    setStatus('Could not open photo (file missing?)');
-    return;
+  if (busy || loadingImage) return;
+  loadingImage = true;
+  try {
+    const result = await window.fototo.openImageAt(photoId);
+    if (busy) return;
+    if (!result) {
+      setStatus('Could not open photo (file missing?)');
+      return;
+    }
+    await applyLoadedImage(result);
+  } finally {
+    loadingImage = false;
   }
-  await applyLoadedImage(result);
 }
 
 async function applyLoadedImage(result: LoadedImage): Promise<void> {
@@ -403,7 +414,7 @@ async function runUpscaleOption(button: HTMLButtonElement, option: number): Prom
 }
 
 async function runAiAction(button: HTMLButtonElement, run: () => Promise<void>): Promise<void> {
-  if (!processor || !bitmap || busy) return;
+  if (!processor || !bitmap || busy || loadingImage) return;
   busy = true;
   button.disabled = true;
   openBtn.disabled = true;
@@ -1017,7 +1028,7 @@ loadRecents();
 window.addEventListener('dragover', (e) => e.preventDefault());
 window.addEventListener('drop', (e) => {
   e.preventDefault();
-  if (busy) return;
+  if (busy || loadingImage) return;
   const file = e.dataTransfer?.files[0];
   if (!file) return;
   const isImage = file.type.startsWith('image/') || /\.(png|jpe?g|webp|gif|bmp|avif)$/i.test(file.name);
@@ -1025,11 +1036,14 @@ window.addEventListener('drop', (e) => {
     setStatus('Not an image file');
     return;
   }
+  loadingImage = true;
   void window.fototo.openDroppedImage(file).then(async (result) => {
-    if (!result) {
+    if (!result || busy) {
       setStatus('Could not open dropped photo');
       return;
     }
     await applyLoadedImage(result);
-  }).catch(() => setStatus('Could not open photo'));
+  }).catch(() => setStatus('Could not open photo')).finally(() => {
+    loadingImage = false;
+  });
 });
